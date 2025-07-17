@@ -51,7 +51,7 @@ export const courseTypeDefs = `
     id: ID!
     title: String!
     description: String!
-    courseId: String!
+    courseId: ID!
     theme: String!
     icon: String
     color: String!
@@ -251,6 +251,16 @@ export const courseTypeDefs = `
 
     # Get user progress
     userProgress: UserProgress!
+  }
+
+  extend type Mutation {
+    generateSampleLessons(unitId: ID!, count: Int): GenerateLessonsResponse!
+  }
+
+  type GenerateLessonsResponse {
+    success: Boolean!
+    message: String!
+    lessons: [Lesson!]!
   }
 `;
 
@@ -474,6 +484,162 @@ export const courseResolvers = {
         console.error('❌ Error in userProgress query:', error.message);
         if (error instanceof GraphQLError) throw error;
         throw new GraphQLError('Failed to fetch user progress');
+      }
+    },
+
+    // Get unit lessons
+    unitLessons: async (parent, { unitId }, { db, user }) => {
+      try {
+        console.log('📚 Getting lessons for unit:', unitId);
+        
+        // Check if unit exists
+        const unit = await db.units.findById(unitId);
+        if (!unit) {
+          console.log('⚠️ Unit not found, returning empty array');
+          return [];
+        }
+
+        // Get lessons with filters
+        const filters = {};
+        if (!user || user.subscriptionType !== 'premium') {
+          filters.isPremium = false;
+        }
+
+        // Get all lessons for this unit
+        const lessons = await db.lessons.getByUnitId(unitId, filters) || [];
+        
+        // Transform lessons
+        return lessons.map(lesson => {
+          const lessonObj = lesson.toObject();
+          
+          // Calculate completion status
+          let isCompleted = false;
+          let userScore = 0;
+          
+          if (user) {
+            // TODO: Get actual completion status and score from progress
+            isCompleted = false;
+            userScore = 0;
+          }
+
+          return {
+            ...lessonObj,
+            id: lesson._id.toString(),
+            isCompleted,
+            userScore,
+            // Ensure required fields have default values
+            totalExercises: lessonObj.totalExercises || 0,
+            estimatedDuration: lessonObj.estimatedDuration || 0,
+            xpReward: lessonObj.xpReward || 0,
+            perfectScoreBonus: lessonObj.perfectScoreBonus || 0,
+            targetAccuracy: lessonObj.targetAccuracy || 80,
+            passThreshold: lessonObj.passThreshold || 60,
+            sortOrder: lessonObj.sortOrder || 0,
+            isUnlocked: true // TODO: Implement proper unlock logic
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in unitLessons query:', error.message);
+        console.error('Stack trace:', error.stack);
+        // Return empty array instead of throwing error
+        return [];
+      }
+    },
+  },
+
+  Mutation: {
+    generateSampleLessons: async (parent, { unitId, count = 3 }, { db, user }) => {
+      try {
+        console.log('🎲 Generating sample lessons for unit:', unitId);
+        
+        // Check authentication
+        if (!user) {
+          throw new GraphQLError('You must be logged in to generate lessons');
+        }
+        
+        // Check if unit exists
+        const unit = await db.units.findById(unitId);
+        if (!unit) {
+          throw new GraphQLError('Unit not found');
+        }
+
+        const sampleLessons = [
+          {
+            title: "Basic Greetings",
+            description: "Learn common greetings and introductions in English",
+            type: "vocabulary",
+            lesson_type: "vocabulary",
+            objective: "Master basic greetings and self-introductions",
+            icon: "👋",
+            totalExercises: 6,
+            estimatedDuration: 15,
+            difficulty: "easy",
+            xpReward: 50,
+            sortOrder: 1,
+            isPremium: false,
+            isPublished: true
+          },
+          {
+            title: "Introducing Yourself",
+            description: "Practice introducing yourself and asking basic questions",
+            type: "conversation",
+            lesson_type: "mixed",
+            objective: "Learn to introduce yourself and ask basic questions",
+            icon: "🗣️",
+            totalExercises: 8,
+            estimatedDuration: 20,
+            difficulty: "easy",
+            xpReward: 60,
+            sortOrder: 2,
+            isPremium: false,
+            isPublished: true
+          },
+          {
+            title: "Common Phrases",
+            description: "Essential phrases for basic communication",
+            type: "vocabulary",
+            lesson_type: "vocabulary",
+            objective: "Learn and practice common everyday phrases",
+            icon: "💬",
+            totalExercises: 7,
+            estimatedDuration: 18,
+            difficulty: "easy",
+            xpReward: 55,
+            sortOrder: 3,
+            isPremium: false,
+            isPublished: true
+          }
+        ];
+
+        // Create lessons
+        const createdLessons = [];
+        for (const lessonData of sampleLessons) {
+          const lesson = await db.lessons.create(
+            {
+              ...lessonData,
+              courseId: unit.courseId,
+              unitId: unit._id,
+            },
+            user.userId // Pass createdBy as second argument
+          );
+          createdLessons.push(lesson);
+        }
+
+        // Update unit's totalLessons count
+        await db.units.update(unitId, {
+          totalLessons: createdLessons.length
+        });
+
+        console.log(`✅ Created ${createdLessons.length} sample lessons`);
+        
+        return {
+          success: true,
+          message: `Created ${createdLessons.length} sample lessons`,
+          lessons: createdLessons
+        };
+      } catch (error) {
+        console.error('❌ Error generating sample lessons:', error);
+        throw new GraphQLError(error.message);
       }
     }
   }
