@@ -26,6 +26,7 @@ import { aiGenerationTypeDefs, aiGenerationResolvers } from './graphql/aiGenerat
 import { contentMutationTypeDefs, contentMutationResolvers } from './graphql/contentManagement.js';
 import { challengeTypeDefs, challengeResolvers } from './graphql/challenges.js';
 import { authUtils } from './utils/auth.js';
+import { learnmapTypeDefs, learnmapResolvers } from './graphql/learnmap.js';
 
 const progressTypeDefs = `
   type UserVocabularyProgress {
@@ -107,6 +108,7 @@ const schema = createSchema({
     ${contentMutationTypeDefs}
     ${challengeTypeDefs}
     ${progressTypeDefs}
+    ${learnmapTypeDefs}
   `,
   resolvers: {
     Query: {
@@ -117,6 +119,7 @@ const schema = createSchema({
       ...vocabularyResolvers.Query,
       ...aiGenerationResolvers.Query,
       ...challengeResolvers.Query,
+      ...learnmapResolvers.Query,
       // Progress tracking queries
       myVocabularyProgress: async (parent, args, context) => {
         if (!context.user) throw new Error('Not authenticated');
@@ -140,6 +143,7 @@ const schema = createSchema({
       ...aiGenerationResolvers.Mutation,
       ...contentMutationResolvers.Mutation,
       ...challengeResolvers.Mutation,
+      ...learnmapResolvers.Mutation,
       // Progress tracking mutations
       upsertVocabularyProgress: async (parent, args, context) => {
         if (!context.user) throw new Error('Not authenticated');

@@ -13,6 +13,7 @@ import { UserVocabularyProgress } from "./userVocabularyProgress.js";
 import { UserExerciseProgress } from "./userExerciseProgress.js";
 import { ChallengeTestSchema, ChallengeTest } from "./challengeTest.js";
 import { UserChallengeAttemptSchema, UserChallengeAttempt } from "./userChallengeAttempt.js";
+import { UserLearnmapProgress } from "./userLearnmapProgress.js";
 
 // Export models
 export const User = mongoose.model("User", UserSchema);
@@ -25,3 +26,4 @@ export { UserVocabularyProgress };
 export { UserExerciseProgress };
 export { ChallengeTest };
 export { UserChallengeAttempt };
+export { UserLearnmapProgress };
