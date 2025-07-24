@@ -185,10 +185,15 @@ export const learnmapResolvers = {
           return null;
         }
         
-        // Fix: context.user already contains userId from auth middleware
-        const userId = context.user.userId;
+        // Fix: Get userId from context.user (could be userId or _id)
+        const userId = context.user.userId || context.user._id || context.user.id;
         console.log('🔍 [userLearnmapProgress] Using userId:', userId);
         console.log('🔍 [userLearnmapProgress] Full context.user:', JSON.stringify(context.user, null, 2));
+        
+        if (!userId) {
+          console.log('❌ [userLearnmapProgress] No userId found in context.user');
+          return null;
+        }
         
         const doc = await UserLearnmapProgress.findOne({ userId, courseId });
         console.log('🔍 [userLearnmapProgress] Found doc:', doc ? `ID: ${doc._id}, Units: ${doc.unitProgress.length}` : 'null');
@@ -240,8 +245,15 @@ export const learnmapResolvers = {
           return { success: false, message: 'Not authenticated', userLearnmapProgress: null };
         }
 
+        // Fix: Get userId from context.user (could be userId or _id)
+        const userId = context.user.userId || context.user._id || context.user.id;
+        
+        if (!userId) {
+          return { success: false, message: 'User ID not found', userLearnmapProgress: null };
+        }
+        
         // Kiểm tra xem đã có progress chưa
-        let doc = await UserLearnmapProgress.findOne({ userId: context.user._id, courseId });
+        let doc = await UserLearnmapProgress.findOne({ userId, courseId });
         if (doc) {
           console.log('✅ [startCourseLearnmap] Progress already exists');
           return { success: true, message: 'Progress already exists', userLearnmapProgress: doc.toObject() };
@@ -287,7 +299,7 @@ export const learnmapResolvers = {
         }
         
         doc = await UserLearnmapProgress.create({
-          userId: context.user._id,
+          userId,
           courseId,
           unitProgress,
           hearts: 5,
@@ -305,7 +317,12 @@ export const learnmapResolvers = {
         console.log('🔄 [updateLearnmapProgress] Starting with:', { courseId, progressInput });
         
         if (!context.user) return { success: false, message: 'Not authenticated', userLearnmapProgress: null };
-        let doc = await UserLearnmapProgress.findOne({ userId: context.user._id, courseId });
+        
+        // Fix: Get userId from context.user
+        const userId = context.user.userId || context.user._id || context.user.id;
+        if (!userId) return { success: false, message: 'User ID not found', userLearnmapProgress: null };
+        
+        let doc = await UserLearnmapProgress.findOne({ userId, courseId });
         if (!doc) return { success: false, message: 'No progress found for this course', userLearnmapProgress: null };
         
         console.log('📊 [updateLearnmapProgress] Found doc:', doc._id);
@@ -456,9 +473,15 @@ export const learnmapResolvers = {
           return { success: false, message: 'Not authenticated', exerciseProgress: null };
         }
 
+        // Fix: Get userId from context.user
+        const userId = context.user.userId || context.user._id || context.user.id;
+        if (!userId) {
+          return { success: false, message: 'User ID not found', exerciseProgress: null };
+        }
+        
         // Tìm learnmap progress chứa lesson này
         const learnmapDoc = await UserLearnmapProgress.findOne({
-          userId: context.user._id,
+          userId,
           'unitProgress.lessonProgress.lessonId': lessonId
         });
 
@@ -591,7 +614,12 @@ export const learnmapResolvers = {
     fastTrackLearnmap: async (parent, { courseId, fastTrackInput }, context) => {
       try {
         if (!context.user) return { success: false, message: 'Not authenticated', userLearnmapProgress: null };
-        let doc = await UserLearnmapProgress.findOne({ userId: context.user._id, courseId });
+        
+        // Fix: Get userId from context.user
+        const userId = context.user.userId || context.user._id || context.user.id;
+        if (!userId) return { success: false, message: 'User ID not found', userLearnmapProgress: null };
+        
+        let doc = await UserLearnmapProgress.findOne({ userId, courseId });
         if (!doc) return { success: false, message: 'No progress found for this course', userLearnmapProgress: null };
         const { unitId, lessonIds, challengeAttemptId, completedAt } = fastTrackInput;
         let updated = false;
@@ -649,7 +677,12 @@ export const learnmapResolvers = {
     reviewCompletedLesson: async (parent, { courseId, reviewInput }, context) => {
       try {
         if (!context.user) return { success: false, message: 'Not authenticated', userLearnmapProgress: null };
-        let doc = await UserLearnmapProgress.findOne({ userId: context.user._id, courseId });
+        
+        // Fix: Get userId from context.user
+        const userId = context.user.userId || context.user._id || context.user.id;
+        if (!userId) return { success: false, message: 'User ID not found', userLearnmapProgress: null };
+        
+        let doc = await UserLearnmapProgress.findOne({ userId, courseId });
         if (!doc) return { success: false, message: 'No progress found for this course', userLearnmapProgress: null };
         const { unitId, lessonId, score, xpEarned, coinEarned, reviewedAt } = reviewInput;
         const unit = doc.unitProgress.find(u => u.unitId.toString() === unitId);
