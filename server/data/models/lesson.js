@@ -260,8 +260,8 @@ export const LessonSchema = new Schema(
     // Difficulty & Requirements
     difficulty: {
       type: String,
-      enum: ['easy', 'medium', 'hard'],
-      default: 'easy'
+      enum: ['beginner', 'intermediate', 'advanced'],
+      default: 'beginner'
     },
     
     // Access Control

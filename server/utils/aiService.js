@@ -20,34 +20,51 @@ const EXERCISE_TEMPLATES = {
     system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
 Bạn tạo bài tập multiple choice phù hợp văn hóa Việt Nam.`,
     
-    main_prompt: `Tạo câu hỏi multiple choice cho từ '{word}' nghĩa '{meaning}' trong ngữ cảnh '{lesson_context}'.
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo câu hỏi multiple choice về chủ đề cơ bản cho người học tiếng Anh.
     
 Yêu cầu:
-- Câu hỏi thực tế, dễ hiểu
+- Câu hỏi thực tế, dễ hiểu, phù hợp level {user_level}
 - 4 đáp án: 1 đúng, 3 sai hợp lý  
 - Đáp án sai cùng chủ đề nhưng rõ ràng sai
 - Tránh ngữ pháp phức tạp
-- Phù hợp tình huống {situation}
+- Nếu có từ vựng cụ thể, sử dụng từ đó làm câu hỏi chính
 
-Trả về JSON format: {
-  "question": "string",
-  "options": ["string1", "string2", "string3", "string4"],
-  "correct_index": "number",
-  "explanation": "string"
+QUAN TRỌNG: Chỉ trả về JSON, không có text khác.
+
+JSON format:
+{
+  "question": "Câu hỏi bằng tiếng Anh",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
 }`,
     
     expected_output_format: {
       question: "string",
       options: ["string1", "string2", "string3", "string4"],
-      correct_index: "number",
-      explanation: "string"
+      correctAnswer: "number",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
     },
     
     fallback_template: {
-      question: "What does '{word}' mean?",
-      options: ["{meaning}", "wrong1", "wrong2", "wrong3"],
-      correct_index: 0,
-      explanation: "'{word}' means '{meaning}'"
+      question: "What is the English word for 'số hai'?",
+      options: ["two", "one", "three", "four"],
+      correctAnswer: 0,
+      feedback: {
+        correct: "Correct! 'số hai' means 'two' in English.",
+        incorrect: "Not quite right. Try again!",
+        hint: "Think about counting numbers in English."
+      }
     }
   },
 
@@ -361,7 +378,8 @@ export class AIService {
         meaning: context.meaning || '',
         lesson_context: context.lesson_context || '',
         situation: context.situation || '',
-        user_level: context.user_level || 'beginner'
+        user_level: context.user_level || 'beginner',
+        user_context: context.user_context || context.lesson_context || 'basic English vocabulary'
       };
       
       Object.keys(variables).forEach(key => {
@@ -372,7 +390,7 @@ export class AIService {
       
       // Call Claude API
       const response = await anthropic.messages.create({
-        model: 'claude-3-sonnet-20240229',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1000,
         temperature: 0.7,
         system: systemContext,
@@ -388,14 +406,25 @@ export class AIService {
       
       // Try to parse JSON response
       try {
+        console.log('📝 Raw AI response:', content);
+        
+        // Try to find JSON in the response
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const exerciseData = JSON.parse(jsonMatch[0]);
-          console.log('✅ Exercise generated successfully');
-          return exerciseData;
+          console.log('✅ Exercise generated successfully:', exerciseData);
+          
+          // Validate the structure
+          if (exerciseData.question && exerciseData.options && exerciseData.correctAnswer !== undefined) {
+            return exerciseData;
+          } else {
+            console.warn('⚠️ Invalid exercise structure, using fallback');
+          }
+        } else {
+          console.warn('⚠️ No JSON found in response');
         }
       } catch (parseError) {
-        console.warn('⚠️ Failed to parse JSON response, using fallback');
+        console.warn('⚠️ Failed to parse JSON response:', parseError.message);
       }
       
       // Use fallback template if parsing fails

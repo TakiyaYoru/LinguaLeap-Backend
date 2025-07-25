@@ -120,6 +120,64 @@ export const learnmapTypeDefs = `
     exerciseProgress: ExerciseProgress
   }
 
+  type SetLessonOrderPayload {
+    success: Boolean!
+    message: String!
+    lesson: Lesson
+  }
+
+  type ReorderLessonsPayload {
+    success: Boolean!
+    message: String!
+    lessons: [Lesson!]!
+  }
+
+  type SetUnitOrderPayload {
+    success: Boolean!
+    message: String!
+    unit: Unit
+  }
+
+  type GetUnitLessonsForAdminPayload {
+    success: Boolean!
+    message: String!
+    lessons: [Lesson!]!
+  }
+
+  # Learnmap with Content Data
+  type LearnmapWithContent {
+    course: Course!
+    units: [UnitWithLessons!]!
+    userProgress: UserLearnmapProgress
+  }
+
+  # Unit with Lessons for Learnmap
+  type UnitWithLessons {
+    id: ID!
+    title: String!
+    description: String!
+    courseId: ID!
+    theme: String!
+    icon: String
+    color: String!
+    totalLessons: Int!
+    totalExercises: Int!
+    estimatedDuration: Int!
+    prerequisites: UnitPrerequisites
+    challenge_test: ChallengeTest
+    isPremium: Boolean!
+    isPublished: Boolean!
+    xpReward: Int!
+    sortOrder: Int!
+    progressPercentage: Int!
+    isUnlocked: Boolean!
+    vocabulary: [UnitVocabulary!]!
+    createdBy: User
+    createdAt: String!
+    updatedAt: String!
+    lessons: [Lesson!]!
+  }
+
   # Input Types
   input ProgressInput {
     unitId: ID
@@ -161,6 +219,8 @@ export const learnmapTypeDefs = `
   extend type Query {
     userLearnmapProgress(courseId: ID!): UserLearnmapProgress
     getExercisesByLesson(lessonId: ID!): GetExercisesByLessonPayload!
+    learnmapWithContent(courseId: ID!): LearnmapWithContent
+    getUnitLessonsForAdmin(unitId: ID!): GetUnitLessonsForAdminPayload!
   }
 
   # Extend Mutation
@@ -170,8 +230,100 @@ export const learnmapTypeDefs = `
     fastTrackLearnmap(courseId: ID!, fastTrackInput: FastTrackInput!): FastTrackLearnmapPayload!
     reviewCompletedLesson(courseId: ID!, reviewInput: ReviewInput!): ReviewCompletedLessonPayload!
     updateExerciseProgress(lessonId: ID!, exerciseProgressInput: ExerciseProgressInput!): UpdateExerciseProgressPayload!
+    
+    # Admin: Set lesson/unit order
+    setLessonOrder(lessonId: ID!, newSortOrder: Int!): SetLessonOrderPayload!
+    reorderLessons(unitId: ID!, lessonIds: [ID!]!): ReorderLessonsPayload!
+    setUnitOrder(unitId: ID!, newSortOrder: Int!): SetUnitOrderPayload!
   }
 `;
+
+// Helper function to update unlock status
+const updateUnlockStatus = async (userProgress, unitsWithLessons) => {
+  console.log('🔓 [updateUnlockStatus] Updating unlock status...');
+  console.log('📊 [updateUnlockStatus] User progress units:', userProgress.unitProgress.length);
+  console.log('📊 [updateUnlockStatus] Units with lessons:', unitsWithLessons.length);
+  
+  let hasChanges = false;
+  
+  // Update unit and lesson unlock status
+  for (let unitIndex = 0; unitIndex < unitsWithLessons.length; unitIndex++) {
+    const unit = unitsWithLessons[unitIndex];
+    console.log(`🔍 [updateUnlockStatus] Processing unit ${unitIndex}: ${unit.title} (${unit.id})`);
+    
+    const unitProgress = userProgress.unitProgress.find(up => up.unitId === unit.id);
+    
+    if (!unitProgress) {
+      console.log(`⚠️ [updateUnlockStatus] No progress found for unit ${unit.id}`);
+      continue;
+    }
+    
+    console.log(`🔍 [updateUnlockStatus] Unit progress status: ${unitProgress.status}`);
+    
+    // Check if unit should be unlocked
+    let shouldUnlockUnit = false;
+    if (unitIndex === 0) {
+      shouldUnlockUnit = true; // First unit is always unlocked
+      console.log(`🔓 [updateUnlockStatus] First unit should be unlocked`);
+    } else {
+      // Check if previous unit is completed
+      const previousUnit = userProgress.unitProgress.find(up => up.unitId === unitsWithLessons[unitIndex - 1].id);
+      shouldUnlockUnit = previousUnit && previousUnit.status === 'completed';
+      console.log(`🔍 [updateUnlockStatus] Previous unit completed: ${shouldUnlockUnit}`);
+    }
+    
+    // Update unit status
+    if (shouldUnlockUnit && unitProgress.status === 'locked') {
+      unitProgress.status = 'unlocked';
+      hasChanges = true;
+      console.log(`🔓 [updateUnlockStatus] Unlocked unit: ${unit.title}`);
+    }
+    
+    // Update lesson unlock status within unit
+    for (let lessonIndex = 0; lessonIndex < unit.lessons.length; lessonIndex++) {
+      const lesson = unit.lessons[lessonIndex];
+      console.log(`🔍 [updateUnlockStatus] Processing lesson ${lessonIndex}: ${lesson.title} (${lesson.id})`);
+      
+      const lessonProgress = unitProgress.lessonProgress.find(lp => lp.lessonId === lesson.id);
+      
+      if (!lessonProgress) {
+        console.log(`⚠️ [updateUnlockStatus] No progress found for lesson ${lesson.id}`);
+        continue;
+      }
+      
+      console.log(`🔍 [updateUnlockStatus] Lesson progress status: ${lessonProgress.status}`);
+      
+      // Check if lesson should be unlocked
+      let shouldUnlockLesson = false;
+      if (lessonIndex === 0 && unitProgress.status === 'unlocked') {
+        shouldUnlockLesson = true; // First lesson of unlocked unit
+        console.log(`🔓 [updateUnlockStatus] First lesson of unlocked unit should be unlocked`);
+      } else if (lessonIndex > 0) {
+        // Check if previous lesson is completed
+        const previousLesson = unitProgress.lessonProgress.find(lp => lp.lessonId === unit.lessons[lessonIndex - 1].id);
+        shouldUnlockLesson = previousLesson && previousLesson.status === 'completed';
+        console.log(`🔍 [updateUnlockStatus] Previous lesson completed: ${shouldUnlockLesson}`);
+      }
+      
+      // Update lesson status
+      if (shouldUnlockLesson && lessonProgress.status === 'locked') {
+        lessonProgress.status = 'unlocked';
+        hasChanges = true;
+        console.log(`🔓 [updateUnlockStatus] Unlocked lesson: ${lesson.title}`);
+      }
+    }
+  }
+  
+  // Save changes if any
+  if (hasChanges) {
+    await userProgress.save();
+    console.log('✅ [updateUnlockStatus] Unlock status updated and saved');
+  } else {
+    console.log('ℹ️ [updateUnlockStatus] No unlock changes needed');
+  }
+  
+  return userProgress;
+};
 
 export const learnmapResolvers = {
   Query: {
@@ -233,6 +385,211 @@ export const learnmapResolvers = {
       } catch (error) {
         console.error('[getExercisesByLesson] Error:', error);
         return { success: false, message: 'Internal server error', exercises: [] };
+      }
+    },
+    getUnitLessonsForAdmin: async (parent, { unitId }, context) => {
+      try {
+        console.log('🔄 [getUnitLessonsForAdmin] Getting lessons for unit:', unitId);
+        
+        if (!context.user || context.user.role !== 'admin') {
+          return { success: false, message: 'Admin access required', lessons: [] };
+        }
+
+        // Get all lessons for the unit (including unpublished)
+        const lessons = await Lesson.find({ unitId }).sort({ sortOrder: 1 });
+        console.log(`✅ [getUnitLessonsForAdmin] Found ${lessons.length} lessons`);
+
+        // Transform lessons to match GraphQL schema
+        const transformedLessons = lessons.map(lesson => {
+          const lessonObj = lesson.toObject();
+          
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          return {
+            ...lessonObj,
+            id: lessonObj._id.toString(),
+            courseId: lessonObj.courseId.toString(),
+            unitId: lessonObj.unitId.toString(),
+            createdAt: safeDate(lessonObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(lessonObj.updatedAt) || new Date().toISOString(),
+            publishedAt: safeDate(lessonObj.publishedAt),
+            createdBy: lessonObj.createdBy && lessonObj.createdBy.username ? lessonObj.createdBy : null,
+          };
+        });
+
+        return { 
+          success: true, 
+          message: `Found ${lessons.length} lessons`, 
+          lessons: transformedLessons 
+        };
+      } catch (error) {
+        console.error('[getUnitLessonsForAdmin] Error:', error);
+        return { success: false, message: 'Internal server error', lessons: [] };
+      }
+    },
+    learnmapWithContent: async (parent, { courseId }, context) => {
+      try {
+        console.log('🔄 [learnmapWithContent] Getting learnmap with content for course:', courseId);
+        
+        if (!context.user) {
+          throw new GraphQLError('Not authenticated', {
+            extensions: { code: 'UNAUTHENTICATED' }
+          });
+        }
+
+        const userId = context.user.userId || context.user._id || context.user.id;
+        if (!userId) {
+          throw new GraphQLError('User ID not found', {
+            extensions: { code: 'UNAUTHENTICATED' }
+          });
+        }
+
+        // Get course with published check
+        const course = await Course.findOne({ _id: courseId, isPublished: true });
+        if (!course) {
+          throw new GraphQLError('Course not found or not published', {
+            extensions: { code: 'COURSE_NOT_FOUND' }
+          });
+        }
+
+        // Get published units for this course
+        const units = await Unit.find({ 
+          courseId: courseId, 
+          isPublished: true 
+        }).sort({ sortOrder: 1 });
+
+        // Get published lessons for each unit
+        const unitsWithLessons = await Promise.all(units.map(async (unit) => {
+          const lessons = await Lesson.find({ 
+            unitId: unit._id, 
+            isPublished: true 
+          }).sort({ sortOrder: 1 });
+
+          console.log(`📊 [learnmapWithContent] Unit ${unit.title} has ${lessons.length} lessons`);
+          lessons.forEach((lesson, idx) => {
+            console.log(`📊 [learnmapWithContent] Lesson ${idx}: ${lesson.title} (sortOrder: ${lesson.sortOrder})`);
+          });
+
+          const unitObj = unit.toObject();
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          return {
+            ...unitObj,
+            id: unitObj._id.toString(),
+            courseId: unitObj.courseId.toString(),
+            createdAt: safeDate(unitObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(unitObj.updatedAt) || new Date().toISOString(),
+            lessons: lessons.map(lesson => {
+              const lessonObj = lesson.toObject();
+              return {
+                ...lessonObj,
+                id: lessonObj._id.toString(),
+                courseId: lessonObj.courseId.toString(),
+                unitId: lessonObj.unitId.toString(),
+                createdAt: safeDate(lessonObj.createdAt) || new Date().toISOString(),
+                updatedAt: safeDate(lessonObj.updatedAt) || new Date().toISOString(),
+              };
+            })
+          };
+        }));
+
+        // Get user progress
+        let userProgress = await UserLearnmapProgress.findOne({ userId, courseId });
+        if (!userProgress) {
+          // Initialize progress if not exists
+          console.log('🔄 [learnmapWithContent] Initializing user progress...');
+          console.log('📊 [learnmapWithContent] Units count:', unitsWithLessons.length);
+          
+          const unitProgress = unitsWithLessons.map((unit, unitIndex) => {
+            console.log(`📊 [learnmapWithContent] Unit ${unitIndex}: ${unit.title} (${unit.id})`);
+            console.log(`📊 [learnmapWithContent] Unit ${unitIndex} lessons count:`, unit.lessons.length);
+            
+            return {
+              unitId: unit.id,
+              status: unitIndex === 0 ? 'unlocked' : 'locked',
+              completedAt: null,
+              lessonProgress: unit.lessons.map((lesson, lessonIndex) => {
+                const isUnlocked = (unitIndex === 0 && lessonIndex === 0);
+                console.log(`📊 [learnmapWithContent] Lesson ${lessonIndex}: ${lesson.title} (${lesson.id}) - Status: ${isUnlocked ? 'unlocked' : 'locked'}`);
+                console.log(`🔍 [learnmapWithContent] Lesson ID type: ${typeof lesson.id}, value: ${lesson.id}`);
+                
+                return {
+                  lessonId: lesson.id,
+                  status: isUnlocked ? 'unlocked' : 'locked',
+                  completedAt: null,
+                  exerciseProgress: [],
+                };
+              }),
+            };
+          });
+
+          console.log('📊 [learnmapWithContent] Created unitProgress structure:');
+          unitProgress.forEach((unit, unitIdx) => {
+            console.log(`📊 [learnmapWithContent] Unit ${unitIdx}: ${unit.unitId}`);
+            unit.lessonProgress.forEach((lesson, lessonIdx) => {
+              console.log(`📊 [learnmapWithContent] Lesson ${lessonIdx}: ${lesson.lessonId} - ${lesson.status}`);
+            });
+          });
+
+          userProgress = await UserLearnmapProgress.create({
+            userId,
+            courseId,
+            unitProgress,
+            hearts: 5,
+            lastHeartUpdate: new Date(),
+            fastTrackHistory: [],
+          });
+          
+          console.log('✅ [learnmapWithContent] User progress created successfully');
+        } else {
+          // Update unlock status based on completed lessons
+          console.log('🔄 [learnmapWithContent] Updating unlock status...');
+          userProgress = await updateUnlockStatus(userProgress, unitsWithLessons);
+        }
+
+        const courseObj = course.toObject();
+        const safeDate = (date) => {
+          if (!date) return null;
+          try {
+            return new Date(date).toISOString();
+          } catch (err) {
+            console.warn('⚠️ Invalid date value:', date);
+            return null;
+          }
+        };
+
+        return {
+          course: {
+            ...courseObj,
+            id: courseObj._id.toString(),
+            createdAt: safeDate(courseObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(courseObj.updatedAt) || new Date().toISOString(),
+            publishedAt: safeDate(courseObj.publishedAt),
+            createdBy: courseObj.createdBy && courseObj.createdBy.username ? courseObj.createdBy : null,
+          },
+          units: unitsWithLessons,
+          userProgress: userProgress.toObject(),
+        };
+      } catch (error) {
+        console.error('❌ [learnmapWithContent] Error:', error);
+        if (error instanceof GraphQLError) throw error;
+        throw new GraphQLError('Failed to get learnmap with content');
       }
     },
   },
@@ -609,6 +966,107 @@ export const learnmapResolvers = {
       } catch (error) {
         console.error('[updateExerciseProgress] Error:', error);
         return { success: false, message: 'Internal server error', exerciseProgress: null };
+      }
+    },
+
+    // Admin: Set lesson order
+    setLessonOrder: async (parent, { lessonId, newSortOrder }, context) => {
+      try {
+        if (!context.user || context.user.role !== 'admin') {
+          return { success: false, message: 'Admin access required', lesson: null };
+        }
+
+        console.log(`📝 [setLessonOrder] Setting lesson ${lessonId} to sort order ${newSortOrder}`);
+
+        const lesson = await Lesson.findById(lessonId);
+        if (!lesson) {
+          return { success: false, message: 'Lesson not found', lesson: null };
+        }
+
+        lesson.sortOrder = newSortOrder;
+        await lesson.save();
+
+        console.log(`✅ [setLessonOrder] Lesson order updated successfully`);
+
+        return { 
+          success: true, 
+          message: 'Lesson order updated successfully', 
+          lesson: lesson 
+        };
+      } catch (error) {
+        console.error('[setLessonOrder] Error:', error);
+        return { success: false, message: 'Internal server error', lesson: null };
+      }
+    },
+
+    // Admin: Reorder lessons in a unit
+    reorderLessons: async (parent, { unitId, lessonIds }, context) => {
+      try {
+        if (!context.user || context.user.role !== 'admin') {
+          return { success: false, message: 'Admin access required', lessons: [] };
+        }
+
+        console.log(`🔄 [reorderLessons] Reordering lessons for unit ${unitId}`);
+        console.log(`📝 [reorderLessons] New order:`, lessonIds);
+
+        // Validate that all lessons belong to the unit
+        const lessons = await Lesson.find({ _id: { $in: lessonIds }, unitId });
+        if (lessons.length !== lessonIds.length) {
+          return { success: false, message: 'Some lessons not found or do not belong to this unit', lessons: [] };
+        }
+
+        // Update sortOrder for each lesson based on the new order
+        const updatePromises = lessonIds.map((lessonId, index) => {
+          const newSortOrder = index + 1;
+          console.log(`📝 [reorderLessons] Setting lesson ${lessonId} to sort order ${newSortOrder}`);
+          return Lesson.findByIdAndUpdate(lessonId, { sortOrder: newSortOrder }, { new: true });
+        });
+
+        const updatedLessons = await Promise.all(updatePromises);
+        
+        // Sort lessons by new sortOrder
+        const sortedLessons = updatedLessons.sort((a, b) => a.sortOrder - b.sortOrder);
+
+        console.log(`✅ [reorderLessons] Successfully reordered ${sortedLessons.length} lessons`);
+
+        return { 
+          success: true, 
+          message: `Successfully reordered ${sortedLessons.length} lessons`, 
+          lessons: sortedLessons 
+        };
+      } catch (error) {
+        console.error('[reorderLessons] Error:', error);
+        return { success: false, message: 'Internal server error', lessons: [] };
+      }
+    },
+
+    // Admin: Set unit order
+    setUnitOrder: async (parent, { unitId, newSortOrder }, context) => {
+      try {
+        if (!context.user || context.user.role !== 'admin') {
+          return { success: false, message: 'Admin access required', unit: null };
+        }
+
+        console.log(`📝 [setUnitOrder] Setting unit ${unitId} to sort order ${newSortOrder}`);
+
+        const unit = await Unit.findById(unitId);
+        if (!unit) {
+          return { success: false, message: 'Unit not found', unit: null };
+        }
+
+        unit.sortOrder = newSortOrder;
+        await unit.save();
+
+        console.log(`✅ [setUnitOrder] Unit order updated successfully`);
+
+        return { 
+          success: true, 
+          message: 'Unit order updated successfully', 
+          unit: unit 
+        };
+      } catch (error) {
+        console.error('[setUnitOrder] Error:', error);
+        return { success: false, message: 'Internal server error', unit: null };
       }
     },
     fastTrackLearnmap: async (parent, { courseId, fastTrackInput }, context) => {

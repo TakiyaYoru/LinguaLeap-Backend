@@ -3,6 +3,7 @@
 // ===============================================
 
 import { GraphQLError } from 'graphql';
+import { Course, Unit, Lesson, Exercise } from '../data/models/index.js';
 
 // ===============================================
 // TYPE DEFINITIONS
@@ -62,12 +63,15 @@ export const courseTypeDefs = `
     challenge_test: ChallengeTest
     isPremium: Boolean!
     isPublished: Boolean!
+    publishedAt: String
     xpReward: Int!
     sortOrder: Int!
     progressPercentage: Int!
     isUnlocked: Boolean!
     vocabulary: [UnitVocabulary!]!
+    createdBy: User
     createdAt: String!
+    updatedAt: String!
   }
 
   type UnitPrerequisites {
@@ -120,6 +124,7 @@ export const courseTypeDefs = `
     difficulty: String!
     isPremium: Boolean!
     isPublished: Boolean!
+    publishedAt: String
     xpReward: Int!
     perfectScoreBonus: Int!
     targetAccuracy: Int!
@@ -129,7 +134,9 @@ export const courseTypeDefs = `
     isCompleted: Boolean!
     isUnlocked: Boolean!
     userScore: Int
+    createdBy: User
     createdAt: String!
+    updatedAt: String!
   }
 
   type VocabularyPoolItem {
@@ -197,6 +204,9 @@ export const courseTypeDefs = `
     sortOrder: Int!
     successRate: Int!
     createdAt: String!
+    updatedAt: String!
+    tags: [String!]!
+    createdBy: User
   }
 
   type PromptTemplate {
@@ -234,8 +244,20 @@ export const courseTypeDefs = `
     # Get all courses
     courses(filters: CourseFilters): [Course!]!
     
+    # Get all courses for admin (including unpublished)
+    adminCourses: [Course!]!
+    
     # Get single course by ID
     course(id: ID!): Course
+    
+    # Get all units for admin (including unpublished)
+    adminUnits: [Unit!]!
+    
+    # Get all lessons for admin (including unpublished)
+    adminLessons: [Lesson!]!
+    
+    # Get all exercises for admin (including unpublished)
+    adminExercises: [Exercise!]!
     
     # Get units by course ID
     courseUnits(courseId: ID!): [Unit!]!
@@ -243,8 +265,14 @@ export const courseTypeDefs = `
     # Get lessons by unit ID
     unitLessons(unitId: ID!): [Lesson!]!
     
+    # Get lessons by unit ID
+    unitLessons(unitId: ID!): [Lesson!]!
+    
     # Get exercises by lesson ID
     lessonExercises(lessonId: ID!): [Exercise!]!
+    
+    # Get single exercise by ID
+    exercise(id: ID!): Exercise
     
     # Get single lesson with exercises
     lesson(id: ID!): Lesson
@@ -270,6 +298,66 @@ export const courseTypeDefs = `
 
 export const courseResolvers = {
   Query: {
+    // Get all courses for admin (including unpublished)
+    adminCourses: async (parent, args, { db, user }) => {
+      // Check if user is admin
+      if (!user || user.role !== 'admin') {
+        throw new GraphQLError('Only admins can access admin courses', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        console.log('📚 Getting admin courses...');
+        
+        // Get all courses without any filters (including unpublished)
+        const courses = await Course.find({})
+          .populate('createdBy', 'username displayName')
+          .populate('prerequisites', 'title level category')
+          .sort({ sortOrder: 1, createdAt: -1 });
+        
+        // Transform courses to match GraphQL schema
+        return courses.map(course => {
+          // First convert to plain object if it's a Mongoose document
+          const courseObj = course.toObject ? course.toObject() : { ...course };
+          
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          return {
+            ...courseObj,
+            id: courseObj._id.toString(),
+            createdBy: courseObj.createdBy && courseObj.createdBy.username ? courseObj.createdBy : null,
+            createdAt: safeDate(courseObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(courseObj.updatedAt) || new Date().toISOString(),
+            publishedAt: safeDate(courseObj.publishedAt),
+            // Ensure other required fields have default values
+            totalUnits: courseObj.totalUnits || 0,
+            totalLessons: courseObj.totalLessons || 0,
+            totalExercises: courseObj.totalExercises || 0,
+            estimatedDuration: courseObj.estimatedDuration || 0,
+            enrollmentCount: courseObj.enrollmentCount || 0,
+            completionCount: courseObj.completionCount || 0,
+            averageRating: courseObj.averageRating || 0,
+            skill_focus: courseObj.skill_focus || [],
+            learningObjectives: courseObj.learningObjectives || []
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in adminCourses query:', error);
+        console.error('Stack trace:', error.stack);
+        throw new GraphQLError('Failed to fetch admin courses');
+      }
+    },
+
     // Get all courses
     courses: async (parent, { filters = {} }, { db }) => {
       try {
@@ -296,7 +384,7 @@ export const courseResolvers = {
           return {
             ...courseObj,
             id: courseObj._id.toString(),
-            createdBy: courseObj.createdBy || null,
+            createdBy: courseObj.createdBy && courseObj.createdBy.username ? courseObj.createdBy : null,
             createdAt: safeDate(courseObj.createdAt) || new Date().toISOString(),
             updatedAt: safeDate(courseObj.updatedAt) || new Date().toISOString(),
             publishedAt: safeDate(courseObj.publishedAt),
@@ -335,12 +423,136 @@ export const courseResolvers = {
         return {
           ...course.toObject(),
           id: course._id.toString(),
-          createdBy: course.createdBy || null
+          createdBy: course.createdBy && course.createdBy.username ? course.createdBy : null
         };
       } catch (error) {
         console.error('❌ Error in course query:', error.message);
         if (error instanceof GraphQLError) throw error;
         throw new GraphQLError('Failed to fetch course');
+      }
+    },
+
+    // Get all units for admin (including unpublished)
+    adminUnits: async (parent, args, { db, user }) => {
+      // Check if user is admin
+      if (!user || user.role !== 'admin') {
+        throw new GraphQLError('Only admins can access admin units', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        console.log('📖 Getting admin units...');
+        
+        // Get all units without any filters (including unpublished)
+        const units = await Unit.find({})
+          .populate('courseId', 'title level category')
+          .populate('createdBy', 'username displayName')
+          .sort({ sortOrder: 1, createdAt: -1 });
+        
+        // Transform units to match GraphQL schema
+        return units.map(unit => {
+          const unitObj = unit.toObject ? unit.toObject() : { ...unit };
+          
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          return {
+            ...unitObj,
+            id: unitObj._id.toString(),
+            courseId: unitObj.courseId ? unitObj.courseId._id.toString() : null,
+            createdAt: safeDate(unitObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(unitObj.updatedAt) || new Date().toISOString(),
+            publishedAt: safeDate(unitObj.publishedAt),
+            createdBy: unitObj.createdBy && unitObj.createdBy.username ? unitObj.createdBy : null,
+            // Ensure other required fields have default values
+            totalLessons: unitObj.totalLessons || 0,
+            totalExercises: unitObj.totalExercises || 0,
+            estimatedDuration: unitObj.estimatedDuration || 0,
+            xpReward: unitObj.xpReward || 0,
+            sortOrder: unitObj.sortOrder || 0,
+            progressPercentage: unitObj.progressPercentage || 0,
+            isUnlocked: unitObj.isUnlocked ?? true,
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in adminUnits query:', error);
+        console.error('Stack trace:', error.stack);
+        throw new GraphQLError('Failed to fetch admin units');
+      }
+    },
+
+    // Get all lessons for admin (including unpublished)
+    adminLessons: async (parent, args, { db, user }) => {
+      // Check if user is admin
+      if (!user || user.role !== 'admin') {
+        throw new GraphQLError('Only admins can access admin lessons', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        console.log('📝 Getting admin lessons...');
+        
+        // Get all lessons without any filters (including unpublished)
+        const lessons = await Lesson.find({})
+          .populate('courseId', 'title level category')
+          .populate('unitId', 'title theme')
+          .populate('createdBy', 'username displayName')
+          .sort({ sortOrder: 1, createdAt: -1 });
+        
+        // Transform lessons to match GraphQL schema
+        return lessons.map(lesson => {
+          const lessonObj = lesson.toObject ? lesson.toObject() : { ...lesson };
+          
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          return {
+            ...lessonObj,
+            id: lessonObj._id.toString(),
+            courseId: lessonObj.courseId ? lessonObj.courseId._id.toString() : null,
+            unitId: lessonObj.unitId ? lessonObj.unitId._id.toString() : null,
+            createdAt: safeDate(lessonObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(lessonObj.updatedAt) || new Date().toISOString(),
+            publishedAt: safeDate(lessonObj.publishedAt),
+            createdBy: lessonObj.createdBy && lessonObj.createdBy.username ? lessonObj.createdBy : null,
+            // Ensure other required fields have default values
+            totalExercises: lessonObj.totalExercises || 0,
+            estimatedDuration: lessonObj.estimatedDuration || 0,
+            xpReward: lessonObj.xpReward || 0,
+            perfectScoreBonus: lessonObj.perfectScoreBonus || 0,
+            targetAccuracy: lessonObj.targetAccuracy || 80,
+            passThreshold: lessonObj.passThreshold || 70,
+            sortOrder: lessonObj.sortOrder || 0,
+            status: lessonObj.status || 'locked',
+            isCompleted: lessonObj.isCompleted || false,
+            isUnlocked: lessonObj.isUnlocked ?? true,
+            userScore: lessonObj.userScore || null,
+            vocabulary_pool: lessonObj.vocabulary_pool || [],
+            lesson_context: lessonObj.lesson_context || null,
+            grammar_point: lessonObj.grammar_point || null,
+            exercise_generation: lessonObj.exercise_generation || null,
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in adminLessons query:', error);
+        console.error('Stack trace:', error.stack);
+        throw new GraphQLError('Failed to fetch admin lessons');
       }
     },
 
@@ -543,6 +755,219 @@ export const courseResolvers = {
         console.error('Stack trace:', error.stack);
         // Return empty array instead of throwing error
         return [];
+      }
+    },
+
+    // Get all exercises for admin (including unpublished)
+    adminExercises: async (parent, args, { db, user }) => {
+      // Check if user is admin
+      if (!user || user.role !== 'admin') {
+        throw new GraphQLError('Only admins can access admin exercises', {
+          extensions: { code: 'FORBIDDEN' }
+        });
+      }
+
+      try {
+        console.log('🎮 Getting admin exercises...');
+        
+        // Get all exercises without any filters (including unpublished)
+        const exercises = await Exercise.find({})
+          .populate('createdBy', 'username displayName')
+          .populate('lessonId', 'title type')
+          .populate('unitId', 'title')
+          .populate('courseId', 'title')
+          .sort({ sortOrder: 1, createdAt: -1 });
+        
+        // Transform exercises to match GraphQL schema
+        return exercises.map(exercise => {
+          // First convert to plain object if it's a Mongoose document
+          const exerciseObj = exercise.toObject ? exercise.toObject() : { ...exercise };
+          
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          // Ensure content is a JSON string for adminExercises
+          let contentString = exerciseObj.content;
+          if (typeof exerciseObj.content === 'object') {
+            try {
+              contentString = JSON.stringify(exerciseObj.content);
+            } catch (error) {
+              console.warn('⚠️ Error stringifying content for exercise:', exerciseObj._id, error.message);
+              contentString = '{}';
+            }
+          } else if (typeof exerciseObj.content !== 'string') {
+            contentString = '{}';
+          }
+
+          return {
+            ...exerciseObj,
+            content: contentString,
+            id: exerciseObj._id.toString(),
+            courseId: exerciseObj.courseId.toString(),
+            unitId: exerciseObj.unitId.toString(),
+            lessonId: exerciseObj.lessonId.toString(),
+            createdBy: exerciseObj.createdBy && exerciseObj.createdBy.username ? exerciseObj.createdBy : null,
+            createdAt: safeDate(exerciseObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(exerciseObj.updatedAt) || new Date().toISOString(),
+            // Ensure other required fields have default values
+            maxScore: exerciseObj.maxScore || 100,
+            xpReward: exerciseObj.xpReward || 5,
+            estimatedTime: exerciseObj.estimatedTime || 30,
+            sortOrder: exerciseObj.sortOrder || 0,
+            successRate: exerciseObj.successRate || 0,
+            skill_focus: exerciseObj.skill_focus || [],
+            tags: exerciseObj.tags || []
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in adminExercises query:', error);
+        console.error('Stack trace:', error.stack);
+        throw new GraphQLError('Failed to fetch admin exercises');
+      }
+    },
+
+    // Get single exercise by ID
+    exercise: async (parent, { id }, { db, user }) => {
+      try {
+        console.log('🎮 Getting exercise:', id);
+        
+        const exercise = await Exercise.findById(id)
+          .populate('createdBy', 'username displayName')
+          .populate('lessonId', 'title type')
+          .populate('unitId', 'title')
+          .populate('courseId', 'title');
+        
+        if (!exercise) {
+          throw new GraphQLError('Exercise not found', {
+            extensions: { code: 'EXERCISE_NOT_FOUND' }
+          });
+        }
+
+        // Transform exercise to match GraphQL schema
+        const exerciseObj = exercise.toObject();
+        
+        // Safely convert dates to ISO strings
+        const safeDate = (date) => {
+          if (!date) return null;
+          try {
+            return new Date(date).toISOString();
+          } catch (err) {
+            console.warn('⚠️ Invalid date value:', date);
+            return null;
+          }
+        };
+
+        // Ensure content is a JSON string for single exercise
+        let contentString = exerciseObj.content;
+        if (typeof exerciseObj.content === 'object') {
+          try {
+            contentString = JSON.stringify(exerciseObj.content);
+          } catch (error) {
+            console.warn('⚠️ Error stringifying content for exercise:', exerciseObj._id, error.message);
+            contentString = '{}';
+          }
+        } else if (typeof exerciseObj.content !== 'string') {
+          contentString = '{}';
+        }
+
+        return {
+          ...exerciseObj,
+          content: contentString,
+          id: exerciseObj._id.toString(),
+          courseId: exerciseObj.courseId.toString(),
+          unitId: exerciseObj.unitId.toString(),
+          lessonId: exerciseObj.lessonId.toString(),
+          createdBy: exerciseObj.createdBy && exerciseObj.createdBy.username ? exerciseObj.createdBy : null,
+          createdAt: safeDate(exerciseObj.createdAt) || new Date().toISOString(),
+          updatedAt: safeDate(exerciseObj.updatedAt) || new Date().toISOString(),
+          // Ensure other required fields have default values
+          maxScore: exerciseObj.maxScore || 100,
+          xpReward: exerciseObj.xpReward || 5,
+          estimatedTime: exerciseObj.estimatedTime || 30,
+          sortOrder: exerciseObj.sortOrder || 0,
+          successRate: exerciseObj.successRate || 0,
+          skill_focus: exerciseObj.skill_focus || [],
+          tags: exerciseObj.tags || []
+        };
+      } catch (error) {
+        console.error('❌ Error in exercise query:', error);
+        if (error instanceof GraphQLError) throw error;
+        throw new GraphQLError('Failed to fetch exercise');
+      }
+    },
+
+    // Get exercises by lesson ID
+    lessonExercises: async (parent, { lessonId }, { db, user }) => {
+      try {
+        console.log('🎮 Getting exercises for lesson:', lessonId);
+        
+        const exercises = await Exercise.find({ lessonId: lessonId })
+          .populate('createdBy', 'username displayName')
+          .populate('lessonId', 'title type')
+          .populate('unitId', 'title')
+          .populate('courseId', 'title')
+          .sort({ sortOrder: 1, createdAt: -1 });
+        
+        // Transform exercises to match GraphQL schema
+        return exercises.map(exercise => {
+          // First convert to plain object if it's a Mongoose document
+          const exerciseObj = exercise.toObject ? exercise.toObject() : { ...exercise };
+          
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          // Ensure content is a JSON string for lessonExercises
+          let contentString = exerciseObj.content;
+          if (typeof exerciseObj.content === 'object') {
+            try {
+              contentString = JSON.stringify(exerciseObj.content);
+            } catch (error) {
+              console.warn('⚠️ Error stringifying content for exercise:', exerciseObj._id, error.message);
+              contentString = '{}';
+            }
+          } else if (typeof exerciseObj.content !== 'string') {
+            contentString = '{}';
+          }
+
+          return {
+            ...exerciseObj,
+            content: contentString,
+            id: exerciseObj._id.toString(),
+            courseId: exerciseObj.courseId.toString(),
+            unitId: exerciseObj.unitId.toString(),
+            lessonId: exerciseObj.lessonId.toString(),
+            createdBy: exerciseObj.createdBy && exerciseObj.createdBy.username ? exerciseObj.createdBy : null,
+            createdAt: safeDate(exerciseObj.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(exerciseObj.updatedAt) || new Date().toISOString(),
+            // Ensure other required fields have default values
+            maxScore: exerciseObj.maxScore || 100,
+            xpReward: exerciseObj.xpReward || 5,
+            estimatedTime: exerciseObj.estimatedTime || 30,
+            sortOrder: exerciseObj.sortOrder || 0,
+            successRate: exerciseObj.successRate || 0,
+            skill_focus: exerciseObj.skill_focus || [],
+            tags: exerciseObj.tags || []
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in lessonExercises query:', error);
+        throw new GraphQLError('Failed to fetch lesson exercises');
       }
     },
   },

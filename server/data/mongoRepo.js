@@ -355,10 +355,12 @@ const unitRepository = {
   async create(unitData, createdBy) {
     try {
       console.log('📝 Creating new unit:', unitData.title);
+      console.log('🔍 [unitRepository] createdBy parameter:', createdBy);
+      console.log('🔍 [unitRepository] unitData:', JSON.stringify(unitData, null, 2));
       
       const unit = new Unit({
         ...unitData,
-        createdBy
+        createdBy: createdBy || unitData.createdBy
       });
       
       const savedUnit = await unit.save();

@@ -191,7 +191,8 @@ export const aiGenerationResolvers = {
           meaning: context.meaning || '',
           lesson_context: context.lesson_context || '',
           situation: context.situation || 'general',
-          user_level: userLevel
+          user_level: userLevel,
+          user_context: context // Pass the entire context string
         });
 
         return {
