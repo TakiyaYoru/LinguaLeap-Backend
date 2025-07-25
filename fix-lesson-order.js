@@ -37,23 +37,15 @@ async function fixLessonOrder() {
           const lesson = lessons[lessonIndex];
           const newSortOrder = lessonIndex + 1;
           
-          let needsUpdate = false;
+          // Fix difficulty field if needed
+          if (lesson.difficulty === 'easy') {
+            console.log(`    🔧 Fixing difficulty for lesson "${lesson.title}" from 'easy' to 'beginner'`);
+            lesson.difficulty = 'beginner';
+          }
           
-          // Fix sortOrder
           if (lesson.sortOrder !== newSortOrder) {
             console.log(`    📝 Updating lesson "${lesson.title}" from sortOrder ${lesson.sortOrder} to ${newSortOrder}`);
             lesson.sortOrder = newSortOrder;
-            needsUpdate = true;
-          }
-          
-          // Fix difficulty enum
-          if (lesson.difficulty === 'easy') {
-            console.log(`    🔧 Fixing lesson "${lesson.title}" difficulty from 'easy' to 'beginner'`);
-            lesson.difficulty = 'beginner';
-            needsUpdate = true;
-          }
-          
-          if (needsUpdate) {
             await lesson.save();
           } else {
             console.log(`    ✅ Lesson "${lesson.title}" already has correct sortOrder: ${lesson.sortOrder}`);

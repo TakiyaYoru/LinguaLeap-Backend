@@ -126,22 +126,10 @@ export const learnmapTypeDefs = `
     lesson: Lesson
   }
 
-  type ReorderLessonsPayload {
-    success: Boolean!
-    message: String!
-    lessons: [Lesson!]!
-  }
-
   type SetUnitOrderPayload {
     success: Boolean!
     message: String!
     unit: Unit
-  }
-
-  type GetUnitLessonsForAdminPayload {
-    success: Boolean!
-    message: String!
-    lessons: [Lesson!]!
   }
 
   # Learnmap with Content Data
@@ -220,7 +208,6 @@ export const learnmapTypeDefs = `
     userLearnmapProgress(courseId: ID!): UserLearnmapProgress
     getExercisesByLesson(lessonId: ID!): GetExercisesByLessonPayload!
     learnmapWithContent(courseId: ID!): LearnmapWithContent
-    getUnitLessonsForAdmin(unitId: ID!): GetUnitLessonsForAdminPayload!
   }
 
   # Extend Mutation
@@ -233,7 +220,6 @@ export const learnmapTypeDefs = `
     
     # Admin: Set lesson/unit order
     setLessonOrder(lessonId: ID!, newSortOrder: Int!): SetLessonOrderPayload!
-    reorderLessons(unitId: ID!, lessonIds: [ID!]!): ReorderLessonsPayload!
     setUnitOrder(unitId: ID!, newSortOrder: Int!): SetUnitOrderPayload!
   }
 `;
@@ -385,54 +371,6 @@ export const learnmapResolvers = {
       } catch (error) {
         console.error('[getExercisesByLesson] Error:', error);
         return { success: false, message: 'Internal server error', exercises: [] };
-      }
-    },
-    getUnitLessonsForAdmin: async (parent, { unitId }, context) => {
-      try {
-        console.log('🔄 [getUnitLessonsForAdmin] Getting lessons for unit:', unitId);
-        
-        if (!context.user || context.user.role !== 'admin') {
-          return { success: false, message: 'Admin access required', lessons: [] };
-        }
-
-        // Get all lessons for the unit (including unpublished)
-        const lessons = await Lesson.find({ unitId }).sort({ sortOrder: 1 });
-        console.log(`✅ [getUnitLessonsForAdmin] Found ${lessons.length} lessons`);
-
-        // Transform lessons to match GraphQL schema
-        const transformedLessons = lessons.map(lesson => {
-          const lessonObj = lesson.toObject();
-          
-          const safeDate = (date) => {
-            if (!date) return null;
-            try {
-              return new Date(date).toISOString();
-            } catch (err) {
-              console.warn('⚠️ Invalid date value:', date);
-              return null;
-            }
-          };
-
-          return {
-            ...lessonObj,
-            id: lessonObj._id.toString(),
-            courseId: lessonObj.courseId.toString(),
-            unitId: lessonObj.unitId.toString(),
-            createdAt: safeDate(lessonObj.createdAt) || new Date().toISOString(),
-            updatedAt: safeDate(lessonObj.updatedAt) || new Date().toISOString(),
-            publishedAt: safeDate(lessonObj.publishedAt),
-            createdBy: lessonObj.createdBy && lessonObj.createdBy.username ? lessonObj.createdBy : null,
-          };
-        });
-
-        return { 
-          success: true, 
-          message: `Found ${lessons.length} lessons`, 
-          lessons: transformedLessons 
-        };
-      } catch (error) {
-        console.error('[getUnitLessonsForAdmin] Error:', error);
-        return { success: false, message: 'Internal server error', lessons: [] };
       }
     },
     learnmapWithContent: async (parent, { courseId }, context) => {
@@ -996,47 +934,6 @@ export const learnmapResolvers = {
       } catch (error) {
         console.error('[setLessonOrder] Error:', error);
         return { success: false, message: 'Internal server error', lesson: null };
-      }
-    },
-
-    // Admin: Reorder lessons in a unit
-    reorderLessons: async (parent, { unitId, lessonIds }, context) => {
-      try {
-        if (!context.user || context.user.role !== 'admin') {
-          return { success: false, message: 'Admin access required', lessons: [] };
-        }
-
-        console.log(`🔄 [reorderLessons] Reordering lessons for unit ${unitId}`);
-        console.log(`📝 [reorderLessons] New order:`, lessonIds);
-
-        // Validate that all lessons belong to the unit
-        const lessons = await Lesson.find({ _id: { $in: lessonIds }, unitId });
-        if (lessons.length !== lessonIds.length) {
-          return { success: false, message: 'Some lessons not found or do not belong to this unit', lessons: [] };
-        }
-
-        // Update sortOrder for each lesson based on the new order
-        const updatePromises = lessonIds.map((lessonId, index) => {
-          const newSortOrder = index + 1;
-          console.log(`📝 [reorderLessons] Setting lesson ${lessonId} to sort order ${newSortOrder}`);
-          return Lesson.findByIdAndUpdate(lessonId, { sortOrder: newSortOrder }, { new: true });
-        });
-
-        const updatedLessons = await Promise.all(updatePromises);
-        
-        // Sort lessons by new sortOrder
-        const sortedLessons = updatedLessons.sort((a, b) => a.sortOrder - b.sortOrder);
-
-        console.log(`✅ [reorderLessons] Successfully reordered ${sortedLessons.length} lessons`);
-
-        return { 
-          success: true, 
-          message: `Successfully reordered ${sortedLessons.length} lessons`, 
-          lessons: sortedLessons 
-        };
-      } catch (error) {
-        console.error('[reorderLessons] Error:', error);
-        return { success: false, message: 'Internal server error', lessons: [] };
       }
     },
 
