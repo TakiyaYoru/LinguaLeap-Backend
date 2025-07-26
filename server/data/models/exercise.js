@@ -142,6 +142,66 @@ export const ExerciseSchema = new Schema(
       default: {}
     },
     
+    // Fill in the Blank - Skill-specific Content
+    fillBlankContent: {
+      // Base fields for all fill_blank exercises
+      sentence: {
+        type: String,
+        required: false
+      },
+      correctAnswer: {
+        type: String,
+        required: false
+      },
+      alternatives: [String],
+      
+      // Vocabulary-specific fields
+      vocabulary: {
+        context: String,
+        wordCategory: String,
+        difficulty: String
+      },
+      
+      // Listening-specific fields
+      listening: {
+        audioText: String,
+        audioUrl: String,
+        playbackSpeed: {
+          type: Number,
+          default: 1.0
+        },
+        replayCount: {
+          type: Number,
+          default: 3
+        }
+      },
+      
+      // Reading-specific fields
+      reading: {
+        passage: String,
+        readingLevel: String,
+        wordCount: Number,
+        context: String
+      },
+      
+      // Grammar-specific fields
+      grammar: {
+        grammarPoint: String,
+        grammarRule: String,
+        explanation: String,
+        examples: [String]
+      },
+      
+      // Pronunciation-specific fields
+      pronunciation: {
+        phonetic: String,
+        pronunciationHint: String,
+        practiceMode: String,
+        audioText: String,
+        audioUrl: String
+      }
+    },
+    
     wordMatching: {
       pairs: [{
         word: {

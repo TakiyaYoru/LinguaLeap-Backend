@@ -265,10 +265,14 @@ const updateUnlockStatus = async (userProgress, unitsWithLessons) => {
       console.log(`🔓 [updateUnlockStatus] Unlocked unit: ${unit.title}`);
     }
     
+    // Sort lessons by sortOrder to ensure proper unlocking sequence
+    const sortedLessons = [...unit.lessons].sort((a, b) => a.sortOrder - b.sortOrder);
+    console.log(`📝 [updateUnlockStatus] Sorted lessons by sortOrder:`, sortedLessons.map(l => `${l.title} (${l.sortOrder})`));
+    
     // Update lesson unlock status within unit
-    for (let lessonIndex = 0; lessonIndex < unit.lessons.length; lessonIndex++) {
-      const lesson = unit.lessons[lessonIndex];
-      console.log(`🔍 [updateUnlockStatus] Processing lesson ${lessonIndex}: ${lesson.title} (${lesson.id})`);
+    for (let lessonIndex = 0; lessonIndex < sortedLessons.length; lessonIndex++) {
+      const lesson = sortedLessons[lessonIndex];
+      console.log(`🔍 [updateUnlockStatus] Processing lesson ${lessonIndex}: ${lesson.title} (${lesson.id}) - sortOrder: ${lesson.sortOrder}`);
       
       const lessonProgress = unitProgress.lessonProgress.find(lp => lp.lessonId === lesson.id);
       
@@ -285,10 +289,11 @@ const updateUnlockStatus = async (userProgress, unitsWithLessons) => {
         shouldUnlockLesson = true; // First lesson of unlocked unit
         console.log(`🔓 [updateUnlockStatus] First lesson of unlocked unit should be unlocked`);
       } else if (lessonIndex > 0) {
-        // Check if previous lesson is completed
-        const previousLesson = unitProgress.lessonProgress.find(lp => lp.lessonId === unit.lessons[lessonIndex - 1].id);
-        shouldUnlockLesson = previousLesson && previousLesson.status === 'completed';
-        console.log(`🔍 [updateUnlockStatus] Previous lesson completed: ${shouldUnlockLesson}`);
+        // Check if previous lesson (by sortOrder) is completed
+        const previousLesson = sortedLessons[lessonIndex - 1];
+        const previousLessonProgress = unitProgress.lessonProgress.find(lp => lp.lessonId === previousLesson.id);
+        shouldUnlockLesson = previousLessonProgress && previousLessonProgress.status === 'completed';
+        console.log(`🔍 [updateUnlockStatus] Previous lesson (${previousLesson.title}) completed: ${shouldUnlockLesson}`);
       }
       
       // Update lesson status
@@ -660,19 +665,37 @@ export const learnmapResolvers = {
           if (progressInput.completedAt) lesson.completedAt = new Date(progressInput.completedAt);
           updated = true;
           
-          // Nếu lesson completed, unlock lesson tiếp theo
+          // Nếu lesson completed, unlock lesson tiếp theo dựa trên sortOrder
           if (progressInput.status === 'completed' || progressInput.status === 'COMPLETED') {
-            const idx = unit.lessonProgress.findIndex(l => l.lessonId.toString() === progressInput.lessonId);
-            if (idx !== -1 && idx + 1 < unit.lessonProgress.length) {
-              const nextLesson = unit.lessonProgress[idx + 1];
-              if (nextLesson.status === 'locked') {
-                nextLesson.status = 'unlocked';
-                console.log('🔓 [updateLearnmapProgress] Unlocked next lesson:', nextLesson.lessonId);
+            // Lấy lesson content để biết sortOrder
+            const lessonContent = await Lesson.findById(progressInput.lessonId);
+            if (lessonContent) {
+              // Tìm lesson có sortOrder cao hơn 1 đơn vị
+              const nextLessonContent = await Lesson.findOne({
+                unitId: progressInput.unitId,
+                sortOrder: lessonContent.sortOrder + 1
+              });
+              
+              if (nextLessonContent) {
+                const nextLesson = unit.lessonProgress.find(
+                  l => l.lessonId.toString() === nextLessonContent._id.toString()
+                );
+                
+                if (nextLesson && nextLesson.status === 'locked') {
+                  nextLesson.status = 'unlocked';
+                  console.log('🔓 [updateLearnmapProgress] Unlocked next lesson by sortOrder:', nextLesson.lessonId);
+                }
               }
             }
             
             // Kiểm tra xem tất cả lessons trong unit đã completed chưa
-            const allLessonsCompleted = unit.lessonProgress.every(l => l.status === 'completed');
+            console.log('🔍 [updateLearnmapProgress] Checking if all lessons completed in unit:', progressInput.unitId);
+            console.log('📊 [updateLearnmapProgress] Unit lesson progress:', unit.lessonProgress.map(l => ({
+              lessonId: l.lessonId,
+              status: l.status
+            })));
+            const allLessonsCompleted = unit.lessonProgress.every(l => l.status === 'completed' || l.status === 'COMPLETED');
+            console.log('🔍 [updateLearnmapProgress] All lessons completed:', allLessonsCompleted);
             if (allLessonsCompleted) {
               console.log('🎉 [updateLearnmapProgress] All lessons in unit completed, unlocking next unit');
               unit.status = 'completed';
@@ -680,8 +703,21 @@ export const learnmapResolvers = {
               
               // Unlock unit tiếp theo
               const unitIdx = doc.unitProgress.findIndex(u => u.unitId.toString() === progressInput.unitId);
+              console.log('🔍 [updateLearnmapProgress] Current unit index:', unitIdx);
+              console.log('📊 [updateLearnmapProgress] Total units:', doc.unitProgress.length);
+              console.log('📊 [updateLearnmapProgress] All units:', doc.unitProgress.map(u => ({
+                unitId: u.unitId,
+                status: u.status
+              })));
+              
               if (unitIdx !== -1 && unitIdx + 1 < doc.unitProgress.length) {
                 const nextUnit = doc.unitProgress[unitIdx + 1];
+                console.log('🔍 [updateLearnmapProgress] Next unit found:', {
+                  unitId: nextUnit.unitId,
+                  status: nextUnit.status,
+                  lessonCount: nextUnit.lessonProgress.length
+                });
+                
                 if (nextUnit.status === 'locked') {
                   nextUnit.status = 'unlocked';
                   console.log('🔓 [updateLearnmapProgress] Unlocked next unit:', nextUnit.unitId);
@@ -691,7 +727,47 @@ export const learnmapResolvers = {
                     nextUnit.lessonProgress[0].status = 'unlocked';
                     console.log('🔓 [updateLearnmapProgress] Unlocked first lesson of next unit:', nextUnit.lessonProgress[0].lessonId);
                   }
+                } else {
+                  console.log('⚠️ [updateLearnmapProgress] Next unit is not locked:', nextUnit.status);
                 }
+              } else {
+                console.log('⚠️ [updateLearnmapProgress] No next unit found or invalid index');
+              }
+            }
+            
+            // Fallback: Nếu không tìm thấy unit tiếp theo trong unitProgress, 
+            // có thể cần thêm unit đó vào progress
+            if (unitIdx !== -1 && unitIdx + 1 >= doc.unitProgress.length) {
+              console.log('🔍 [updateLearnmapProgress] Current unit is last in progress, checking if there are more units in course...');
+              
+              // Lấy tất cả units của course
+              const allUnits = await Unit.find({ courseId }).sort({ sortOrder: 1 });
+              console.log('📊 [updateLearnmapProgress] Total units in course:', allUnits.length);
+              
+              // Nếu có unit tiếp theo trong course nhưng không có trong progress
+              if (unitIdx + 1 < allUnits.length) {
+                const nextUnitInCourse = allUnits[unitIdx + 1];
+                console.log('🔍 [updateLearnmapProgress] Found next unit in course:', nextUnitInCourse._id);
+                
+                // Lấy lessons của unit tiếp theo
+                const nextUnitLessons = await Lesson.find({ unitId: nextUnitInCourse._id }).sort({ sortOrder: 1 });
+                console.log('📊 [updateLearnmapProgress] Next unit lessons:', nextUnitLessons.length);
+                
+                // Tạo progress cho unit tiếp theo
+                const nextUnitProgress = {
+                  unitId: nextUnitInCourse._id,
+                  status: 'unlocked',
+                  completedAt: null,
+                  lessonProgress: nextUnitLessons.map((lesson, idx) => ({
+                    lessonId: lesson._id,
+                    status: idx === 0 ? 'unlocked' : 'locked', // Unlock first lesson
+                    completedAt: null,
+                    exerciseProgress: [],
+                  })),
+                };
+                
+                doc.unitProgress.push(nextUnitProgress);
+                console.log('🔓 [updateLearnmapProgress] Added next unit to progress:', nextUnitInCourse._id);
               }
             }
           }
@@ -844,13 +920,29 @@ export const learnmapResolvers = {
           targetLesson.status = 'completed';
           targetLesson.completedAt = new Date();
 
-          // Gọi logic unlock lesson tiếp theo
-          const lessonIdx = targetUnit.lessonProgress.findIndex(l => l.lessonId.toString() === lessonId);
-          if (lessonIdx !== -1 && lessonIdx + 1 < targetUnit.lessonProgress.length) {
-            const nextLesson = targetUnit.lessonProgress[lessonIdx + 1];
-            if (nextLesson.status === 'locked') {
-              nextLesson.status = 'unlocked';
-              console.log('🔓 [updateExerciseProgress] Unlocked next lesson:', nextLesson.lessonId);
+          // Gọi logic unlock lesson tiếp theo dựa trên sortOrder
+          // Tìm lesson hiện tại trong progress
+          const currentLessonProgress = targetUnit.lessonProgress.find(l => l.lessonId.toString() === lessonId);
+          if (currentLessonProgress) {
+            // Tìm lesson có sortOrder cao hơn 1 đơn vị
+            // Cần lấy lesson content để biết sortOrder
+            const lessonContent = await Lesson.findById(lessonId);
+            if (lessonContent) {
+              const nextLessonContent = await Lesson.findOne({
+                unitId: targetUnit.unitId,
+                sortOrder: lessonContent.sortOrder + 1
+              });
+              
+              if (nextLessonContent) {
+                const nextLessonProgress = targetUnit.lessonProgress.find(
+                  l => l.lessonId.toString() === nextLessonContent._id.toString()
+                );
+                
+                if (nextLessonProgress && nextLessonProgress.status === 'locked') {
+                  nextLessonProgress.status = 'unlocked';
+                  console.log('🔓 [updateExerciseProgress] Unlocked next lesson by sortOrder:', nextLessonProgress.lessonId);
+                }
+              }
             }
           }
 

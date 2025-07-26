@@ -72,33 +72,179 @@ JSON format:
     system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
 Bạn tạo bài tập fill blank phù hợp văn hóa Việt Nam.`,
     
-    main_prompt: `Tạo câu điền từ cho từ '{word}' nghĩa '{meaning}' trong ngữ cảnh '{lesson_context}'.
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo câu điền từ cho từ '{word}' nghĩa '{meaning}' trong ngữ cảnh '{lesson_context}'.
     
 Yêu cầu:
-- Câu đơn giản, dễ hiểu
+- Câu đơn giản, dễ hiểu, phù hợp level {user_level}
 - Từ cần điền phù hợp ngữ cảnh
 - Có thể có 1-2 từ thay thế
 - Phù hợp tình huống {situation}
+- Sử dụng _____ để đánh dấu chỗ trống
 
-Trả về JSON format: {
-  "sentence": "string",
-  "correct_word": "string",
-  "translation": "string",
-  "alternatives": ["string1", "string2"]
+QUAN TRỌNG: Chỉ trả về JSON, không có text khác.
+
+JSON format:
+{
+  "sentence": "Câu có chỗ trống bằng tiếng Anh",
+  "correctAnswer": "Từ đúng",
+  "alternatives": ["Từ thay thế 1", "Từ thay thế 2"],
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
 }`,
     
     expected_output_format: {
       sentence: "string",
-      correct_word: "string",
-      translation: "string",
-      alternatives: ["string1", "string2"]
+      correctAnswer: "string",
+      alternatives: ["string1", "string2"],
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
     },
     
     fallback_template: {
       sentence: "I say _____ when I meet my friends.",
-      correct_word: "{word}",
-      translation: "Tôi nói _____ khi gặp bạn bè.",
-      alternatives: ["hi", "hey"]
+      correctAnswer: "hello",
+      alternatives: ["hi", "hey"],
+      feedback: {
+        correct: "Correct! 'hello' is a common greeting.",
+        incorrect: "Not quite right. Try again!",
+        hint: "Think about common greetings in English."
+      }
+    }
+  },
+
+  // Fill in the Blank - Skill-specific templates
+  fill_blank_vocabulary: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập fill blank tập trung vào từ vựng.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo bài tập điền từ tập trung vào từ vựng cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào học từ vựng mới
+- Cung cấp ngữ cảnh rõ ràng
+- Có các từ thay thế hợp lý
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "sentence": "Câu có chỗ trống",
+  "correctAnswer": "Từ đúng",
+  "alternatives": ["Từ thay thế 1", "Từ thay thế 2"],
+  "vocabulary": {
+    "context": "Ngữ cảnh sử dụng từ",
+    "wordCategory": "Danh mục từ vựng",
+    "difficulty": "beginner"
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      correctAnswer: "string",
+      alternatives: ["string1", "string2"],
+      vocabulary: {
+        context: "string",
+        wordCategory: "string",
+        difficulty: "string"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      sentence: "I go to _____ every day.",
+      correctAnswer: "school",
+      alternatives: ["home", "work"],
+      vocabulary: {
+        context: "daily routine",
+        wordCategory: "places",
+        difficulty: "beginner"
+      },
+      feedback: {
+        correct: "Correct! 'school' is a place you go to study.",
+        incorrect: "Not quite right. Think about where students go.",
+        hint: "This is a place for learning."
+      }
+    }
+  },
+
+  fill_blank_listening: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập fill blank tập trung vào listening.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo bài tập điền từ tập trung vào listening cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tạo câu dễ nghe, rõ ràng
+- Từ cần điền nổi bật trong câu
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "sentence": "Câu có chỗ trống",
+  "correctAnswer": "Từ đúng",
+  "alternatives": ["Từ thay thế 1", "Từ thay thế 2"],
+  "listening": {
+    "audioText": "Câu hoàn chỉnh để tạo audio",
+    "playbackSpeed": 1.0,
+    "replayCount": 3
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      correctAnswer: "string",
+      alternatives: ["string1", "string2"],
+      listening: {
+        audioText: "string",
+        playbackSpeed: "number",
+        replayCount: "number"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      sentence: "I go to _____ every day.",
+      correctAnswer: "school",
+      alternatives: ["home", "work"],
+      listening: {
+        audioText: "I go to school every day.",
+        playbackSpeed: 1.0,
+        replayCount: 3
+      },
+      feedback: {
+        correct: "Correct! You heard 'school' clearly.",
+        incorrect: "Listen again carefully to the missing word.",
+        hint: "Focus on the word after 'to'."
+      }
     }
   },
 
@@ -362,10 +508,21 @@ export class AIService {
   static async generateExercise(exerciseType, context) {
     try {
       console.log('🤖 Generating exercise:', exerciseType);
+      console.log('📝 Context:', context);
       
-      const template = EXERCISE_TEMPLATES[exerciseType];
+      // Handle skill-specific fill_blank exercises
+      let actualExerciseType = exerciseType;
+      if (exerciseType === 'fill_blank' && context.skill_focus) {
+        const skillFocus = Array.isArray(context.skill_focus) 
+          ? context.skill_focus[0] 
+          : context.skill_focus;
+        actualExerciseType = `fill_blank_${skillFocus}`;
+        console.log('🎯 Using skill-specific template:', actualExerciseType);
+      }
+      
+      const template = EXERCISE_TEMPLATES[actualExerciseType] || EXERCISE_TEMPLATES[exerciseType];
       if (!template) {
-        throw new Error(`Unsupported exercise type: ${exerciseType}`);
+        throw new Error(`Unsupported exercise type: ${actualExerciseType}`);
       }
       
       // Replace variables in prompt
@@ -408,14 +565,42 @@ export class AIService {
       try {
         console.log('📝 Raw AI response:', content);
         
-        // Try to find JSON in the response
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const exerciseData = JSON.parse(jsonMatch[0]);
+        // Try to find JSON in the response - get the last complete JSON object
+        const jsonMatches = content.match(/\{[\s\S]*?\}/g);
+        if (jsonMatches && jsonMatches.length > 0) {
+          // Use the last JSON object (most complete)
+          const lastJsonMatch = jsonMatches[jsonMatches.length - 1];
+          const exerciseData = JSON.parse(lastJsonMatch);
           console.log('✅ Exercise generated successfully:', exerciseData);
           
-          // Validate the structure
-          if (exerciseData.question && exerciseData.options && exerciseData.correctAnswer !== undefined) {
+          // Validate the structure based on exercise type
+          let isValid = false;
+          
+          if (exerciseType === 'multiple_choice') {
+            isValid = exerciseData.question && exerciseData.options && exerciseData.correctAnswer !== undefined;
+          } else if (exerciseType === 'fill_blank' || exerciseType.startsWith('fill_blank_')) {
+            // Basic validation for all fill_blank types
+            isValid = exerciseData.sentence && exerciseData.correctAnswer && exerciseData.feedback;
+            
+                      // Additional validation for skill-specific types
+          if (exerciseType === 'fill_blank_vocabulary') {
+            isValid = isValid && exerciseData.vocabulary;
+          } else if (exerciseType === 'fill_blank_listening') {
+            isValid = isValid && exerciseData.listening && exerciseData.listening.audioText;
+          } else if (exerciseType === 'fill_blank_grammar') {
+            // Grammar doesn't require additional fields, basic validation is enough
+            isValid = isValid;
+          } else if (exerciseType === 'fill_blank_reading') {
+            isValid = isValid && exerciseData.reading;
+          } else if (exerciseType === 'fill_blank_pronunciation') {
+            isValid = isValid && exerciseData.pronunciation;
+          }
+          } else {
+            // For other types, just check if we have some basic structure
+            isValid = Object.keys(exerciseData).length > 0;
+          }
+          
+          if (isValid) {
             return exerciseData;
           } else {
             console.warn('⚠️ Invalid exercise structure, using fallback');

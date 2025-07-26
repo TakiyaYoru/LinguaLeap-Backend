@@ -213,8 +213,8 @@ export const courseTypeDefs = `
     system_context: String
     main_prompt: String
     variables: [String!]!
-    expected_output_format: String! # JSON string
-    fallback_template: String! # JSON string
+    expected_output_format: String # JSON string (nullable)
+    fallback_template: String # JSON string (nullable)
   }
 
   type GenerationRules {
@@ -807,9 +807,24 @@ export const courseResolvers = {
             contentString = '{}';
           }
 
+          // Handle prompt_template fields
+          let promptTemplate = null;
+          if (exerciseObj.prompt_template) {
+            promptTemplate = {
+              ...exerciseObj.prompt_template,
+              expected_output_format: exerciseObj.prompt_template.expected_output_format 
+                ? JSON.stringify(exerciseObj.prompt_template.expected_output_format)
+                : null,
+              fallback_template: exerciseObj.prompt_template.fallback_template
+                ? JSON.stringify(exerciseObj.prompt_template.fallback_template)
+                : null
+            };
+          }
+
           return {
             ...exerciseObj,
             content: contentString,
+            prompt_template: promptTemplate,
             id: exerciseObj._id.toString(),
             courseId: exerciseObj.courseId.toString(),
             unitId: exerciseObj.unitId.toString(),
@@ -878,9 +893,24 @@ export const courseResolvers = {
           contentString = '{}';
         }
 
+        // Handle prompt_template fields
+        let promptTemplate = null;
+        if (exerciseObj.prompt_template) {
+          promptTemplate = {
+            ...exerciseObj.prompt_template,
+            expected_output_format: exerciseObj.prompt_template.expected_output_format 
+              ? JSON.stringify(exerciseObj.prompt_template.expected_output_format)
+              : null,
+            fallback_template: exerciseObj.prompt_template.fallback_template
+              ? JSON.stringify(exerciseObj.prompt_template.fallback_template)
+              : null
+          };
+        }
+
         return {
           ...exerciseObj,
           content: contentString,
+          prompt_template: promptTemplate,
           id: exerciseObj._id.toString(),
           courseId: exerciseObj.courseId.toString(),
           unitId: exerciseObj.unitId.toString(),
@@ -945,9 +975,24 @@ export const courseResolvers = {
             contentString = '{}';
           }
 
+          // Handle prompt_template fields
+          let promptTemplate = null;
+          if (exerciseObj.prompt_template) {
+            promptTemplate = {
+              ...exerciseObj.prompt_template,
+              expected_output_format: exerciseObj.prompt_template.expected_output_format 
+                ? JSON.stringify(exerciseObj.prompt_template.expected_output_format)
+                : null,
+              fallback_template: exerciseObj.prompt_template.fallback_template
+                ? JSON.stringify(exerciseObj.prompt_template.fallback_template)
+                : null
+            };
+          }
+
           return {
             ...exerciseObj,
             content: contentString,
+            prompt_template: promptTemplate,
             id: exerciseObj._id.toString(),
             courseId: exerciseObj.courseId.toString(),
             unitId: exerciseObj.unitId.toString(),

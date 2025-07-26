@@ -63,12 +63,22 @@ export const aiGenerationTypeDefs = `
     pitch: Float
   }
 
+  input ExerciseContextInput {
+    user_context: String
+    skill_focus: [String!]
+    word: String
+    meaning: String
+    lesson_context: String
+    situation: String
+    user_level: String
+  }
+
   extend type Query {
     # Generate exercises for a lesson
     generateLessonExercises(input: ExerciseGenerationInput!): ExerciseGenerationResult!
     
     # Generate single exercise
-    generateExercise(type: String!, context: String!): GeneratedExercise!
+    generateExercise(type: String!, context: ExerciseContextInput!): GeneratedExercise!
     
     # Get available voices for TTS
     getAvailableVoices(languageCode: String): [String!]!
@@ -184,27 +194,36 @@ export const aiGenerationResolvers = {
 
       try {
         console.log('🤖 Generating single exercise:', type);
+        console.log('📝 Context:', context);
 
         const userLevel = user.currentLevel || 'A1';
-        const exerciseContent = await AIService.generateExercise(type, {
+        
+        // Use context object directly since it's now an input type
+        const contextObj = {
           word: context.word || '',
           meaning: context.meaning || '',
           lesson_context: context.lesson_context || '',
           situation: context.situation || 'general',
           user_level: userLevel,
-          user_context: context // Pass the entire context string
-        });
+          user_context: context.user_context || '',
+          skill_focus: context.skill_focus || null
+        };
+
+        console.log('📝 Parsed context:', contextObj);
+
+        const exerciseContent = await AIService.generateExercise(type, contextObj);
 
         return {
           type,
           content: JSON.stringify(exerciseContent),
-          vocabulary: context.vocabulary || null,
+          vocabulary: null,
           sortOrder: 1,
           audioUrl: null
         };
 
       } catch (error) {
         console.error('❌ Error generating single exercise:', error.message);
+        console.error('❌ Error stack:', error.stack);
         throw new GraphQLError('Failed to generate exercise');
       }
     },

@@ -170,7 +170,11 @@ export const contentMutationTypeDefs = `
   input UpdateExerciseInput {
     title: String
     instruction: String
+    courseId: ID
+    unitId: ID
+    lessonId: ID
     type: String
+    skill_focus: [String!]
     question: ExerciseQuestionInput
     content: String
     maxScore: Int
@@ -178,6 +182,8 @@ export const contentMutationTypeDefs = `
     xpReward: Int
     timeLimit: Int
     estimatedTime: Int
+    requires_audio: Boolean
+    requires_microphone: Boolean
     isPremium: Boolean
     isActive: Boolean
     sortOrder: Int
