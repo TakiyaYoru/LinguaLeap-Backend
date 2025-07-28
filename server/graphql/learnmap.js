@@ -59,6 +59,7 @@ export const learnmapTypeDefs = `
     title: String
     instruction: String!
     type: String!
+    exercise_subtype: String! # NEW FIELD
     question: ExerciseQuestion!
     content: String! # JSON string containing exercise-specific content
     maxScore: Int!
@@ -68,6 +69,9 @@ export const learnmapTypeDefs = `
     estimatedTime: Int!
     xpReward: Int!
     sortOrder: Int!
+    skill_focus: [String!]
+    requires_audio: Boolean!
+    requires_microphone: Boolean!
   }
 
   type ExerciseQuestion {

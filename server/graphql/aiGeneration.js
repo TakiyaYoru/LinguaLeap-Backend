@@ -14,6 +14,7 @@ import TTSService from '../utils/ttsService.js';
 export const aiGenerationTypeDefs = `
   type GeneratedExercise {
     type: String!
+    exercise_subtype: String!
     content: String! # JSON string
     vocabulary: VocabularyInfo
     sortOrder: Int!
@@ -213,8 +214,14 @@ export const aiGenerationResolvers = {
 
         const exerciseContent = await AIService.generateExercise(type, contextObj);
 
+        // Determine exercise subtype based on type and skill_focus
+        const skillFocus = context.skill_focus || ['vocabulary'];
+        const primarySkill = skillFocus[0];
+        const exerciseSubtype = `${primarySkill}_${type}`;
+        
         return {
           type,
+          exercise_subtype: exerciseSubtype,
           content: JSON.stringify(exerciseContent),
           vocabulary: null,
           sortOrder: 1,

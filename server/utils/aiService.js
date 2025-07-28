@@ -12,7 +12,7 @@ const anthropic = new Anthropic({
 });
 
 // ===============================================
-// PROMPT TEMPLATES FOR 9 EXERCISE TYPES
+// PROMPT TEMPLATES FOR 28 EXERCISE SUBTYPES
 // ===============================================
 
 const EXERCISE_TEMPLATES = {
@@ -64,6 +64,263 @@ JSON format:
         correct: "Correct! 'số hai' means 'two' in English.",
         incorrect: "Not quite right. Try again!",
         hint: "Think about counting numbers in English."
+      }
+    }
+  },
+
+  // Multiple Choice - Skill-specific templates
+  multiple_choice_vocabulary: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập multiple choice tập trung vào từ vựng.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo câu hỏi multiple choice tập trung vào từ vựng cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào học từ vựng mới
+- Câu hỏi về nghĩa từ hoặc cách sử dụng
+- 4 đáp án hợp lý
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "question": "Câu hỏi về từ vựng",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "vocabulary": {
+    "context": "Ngữ cảnh sử dụng từ",
+    "wordCategory": "Danh mục từ vựng",
+    "difficulty": "beginner"
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      vocabulary: {
+        context: "string",
+        wordCategory: "string",
+        difficulty: "string"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      question: "What does 'apple' mean?",
+      options: ["A red fruit", "A yellow fruit", "A green vegetable", "A drink"],
+      correctAnswer: 0,
+      vocabulary: {
+        context: "food and fruits",
+        wordCategory: "fruits",
+        difficulty: "beginner"
+      },
+      feedback: {
+        correct: "Correct! An apple is a red fruit.",
+        incorrect: "Think about what an apple looks like.",
+        hint: "This is a common fruit, usually red or green."
+      }
+    }
+  },
+
+  multiple_choice_grammar: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập multiple choice tập trung vào ngữ pháp.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo câu hỏi multiple choice tập trung vào ngữ pháp cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào cấu trúc ngữ pháp
+- Câu hỏi về quy tắc ngữ pháp
+- 4 đáp án hợp lý về mặt ngữ pháp
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "question": "Câu hỏi về ngữ pháp",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "grammar": {
+    "pattern": "Cấu trúc ngữ pháp",
+    "rule": "Quy tắc ngữ pháp",
+    "difficulty": "beginner"
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      grammar: {
+        pattern: "string",
+        rule: "string",
+        difficulty: "string"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      question: "Which form is correct: 'I _____ to school'?",
+      options: ["go", "goes", "going", "went"],
+      correctAnswer: 0,
+      grammar: {
+        pattern: "Present Simple",
+        rule: "Use base form with 'I'",
+        difficulty: "beginner"
+      },
+      feedback: {
+        correct: "Correct! Use 'go' with 'I' in present simple.",
+        incorrect: "Think about subject-verb agreement.",
+        hint: "What form do we use with 'I'?"
+      }
+    }
+  },
+
+  multiple_choice_listening: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập multiple choice tập trung vào listening.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo câu hỏi multiple choice tập trung vào listening cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào kỹ năng nghe
+- Câu hỏi về nội dung audio
+- 4 đáp án hợp lý
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "question": "Câu hỏi về nội dung audio",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "listening": {
+    "audioText": "Nội dung audio",
+    "playbackSpeed": 1.0,
+    "replayCount": 3
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      listening: {
+        audioText: "string",
+        playbackSpeed: "number",
+        replayCount: "number"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      question: "What did you hear?",
+      options: ["Hello", "Goodbye", "Thank you", "Sorry"],
+      correctAnswer: 0,
+      listening: {
+        audioText: "Hello, how are you?",
+        playbackSpeed: 1.0,
+        replayCount: 3
+      },
+      feedback: {
+        correct: "Correct! You heard 'Hello'.",
+        incorrect: "Listen again carefully.",
+        hint: "Focus on the first word."
+      }
+    }
+  },
+
+  multiple_choice_pronunciation: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập multiple choice tập trung vào phát âm.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo câu hỏi multiple choice tập trung vào phát âm cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào phát âm
+- Câu hỏi về cách phát âm
+- 4 đáp án hợp lý về mặt phát âm
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "question": "Câu hỏi về phát âm",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "pronunciation": {
+    "phonetic": "Phiên âm IPA",
+    "pattern": "Quy tắc phát âm",
+    "difficulty": "beginner"
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      pronunciation: {
+        phonetic: "string",
+        pattern: "string",
+        difficulty: "string"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      question: "How do you pronounce 'cat'?",
+      options: ["/kæt/", "/kɑːt/", "/keɪt/", "/kət/"],
+      correctAnswer: 0,
+      pronunciation: {
+        phonetic: "/kæt/",
+        pattern: "CVC pattern",
+        difficulty: "beginner"
+      },
+      feedback: {
+        correct: "Correct! 'cat' is pronounced /kæt/.",
+        incorrect: "Think about the vowel sound.",
+        hint: "The vowel 'a' in 'cat' is short."
       }
     }
   },
@@ -185,6 +442,70 @@ JSON format:
     }
   },
 
+  fill_blank_grammar: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập fill blank tập trung vào ngữ pháp.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo bài tập điền từ tập trung vào ngữ pháp cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào cấu trúc ngữ pháp
+- Cung cấp ngữ cảnh ngữ pháp rõ ràng
+- Có các từ thay thế hợp lý về mặt ngữ pháp
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "sentence": "Câu có chỗ trống",
+  "correctAnswer": "Từ đúng",
+  "alternatives": ["Từ thay thế 1", "Từ thay thế 2"],
+  "grammar": {
+    "pattern": "Cấu trúc ngữ pháp",
+    "rule": "Quy tắc ngữ pháp",
+    "difficulty": "beginner"
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      correctAnswer: "string",
+      alternatives: ["string1", "string2"],
+      grammar: {
+        pattern: "string",
+        rule: "string",
+        difficulty: "string"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      sentence: "I _____ to school every day.",
+      correctAnswer: "go",
+      alternatives: ["goes", "going"],
+      grammar: {
+        pattern: "Present Simple",
+        rule: "Use base form of verb with 'I'",
+        difficulty: "beginner"
+      },
+      feedback: {
+        correct: "Correct! Use 'go' with 'I' in present simple.",
+        incorrect: "Think about the subject-verb agreement.",
+        hint: "What form of verb do we use with 'I'?"
+      }
+    }
+  },
+
   fill_blank_listening: {
     system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
 Bạn tạo bài tập fill blank tập trung vào listening.`,
@@ -244,6 +565,70 @@ JSON format:
         correct: "Correct! You heard 'school' clearly.",
         incorrect: "Listen again carefully to the missing word.",
         hint: "Focus on the word after 'to'."
+      }
+    }
+  },
+
+  fill_blank_writing: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập fill blank tập trung vào writing.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo bài tập điền từ tập trung vào writing cho từ '{word}' nghĩa '{meaning}'.
+    
+Yêu cầu:
+- Tập trung vào kỹ năng viết
+- Cung cấp ngữ cảnh viết rõ ràng
+- Có các từ thay thế hợp lý về mặt writing
+- Phù hợp level {user_level}
+
+JSON format:
+{
+  "sentence": "Câu có chỗ trống",
+  "correctAnswer": "Từ đúng",
+  "alternatives": ["Từ thay thế 1", "Từ thay thế 2"],
+  "writing": {
+    "style": "Phong cách viết",
+    "context": "Ngữ cảnh viết",
+    "difficulty": "beginner"
+  },
+  "feedback": {
+    "correct": "Đúng rồi!",
+    "incorrect": "Sai rồi, thử lại!",
+    "hint": "Gợi ý"
+  }
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      correctAnswer: "string",
+      alternatives: ["string1", "string2"],
+      writing: {
+        style: "string",
+        context: "string",
+        difficulty: "string"
+      },
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
+    
+    fallback_template: {
+      sentence: "In my letter, I _____ about my family.",
+      correctAnswer: "wrote",
+      alternatives: ["write", "writing"],
+      writing: {
+        style: "formal letter",
+        context: "personal correspondence",
+        difficulty: "beginner"
+      },
+      feedback: {
+        correct: "Correct! 'wrote' is the past tense form.",
+        incorrect: "Think about the tense in this sentence.",
+        hint: "This sentence is in past tense."
       }
     }
   },
@@ -510,14 +895,34 @@ export class AIService {
       console.log('🤖 Generating exercise:', exerciseType);
       console.log('📝 Context:', context);
       
-      // Handle skill-specific fill_blank exercises
+      // Handle skill-specific exercises
       let actualExerciseType = exerciseType;
-      if (exerciseType === 'fill_blank' && context.skill_focus) {
+      if (context.skill_focus) {
         const skillFocus = Array.isArray(context.skill_focus) 
           ? context.skill_focus[0] 
           : context.skill_focus;
-        actualExerciseType = `fill_blank_${skillFocus}`;
-        console.log('🎯 Using skill-specific template:', actualExerciseType);
+        
+        // Map exercise type + skill focus to subtype
+        const subtypeMap = {
+          'multiple_choice': {
+            'vocabulary': 'multiple_choice_vocabulary',
+            'grammar': 'multiple_choice_grammar',
+            'listening': 'multiple_choice_listening',
+            'pronunciation': 'multiple_choice_pronunciation'
+          },
+          'fill_blank': {
+            'vocabulary': 'fill_blank_vocabulary',
+            'grammar': 'fill_blank_grammar',
+            'listening': 'fill_blank_listening',
+            'writing': 'fill_blank_writing'
+          }
+        };
+        
+        const typeMapping = subtypeMap[exerciseType];
+        if (typeMapping && typeMapping[skillFocus]) {
+          actualExerciseType = typeMapping[skillFocus];
+          console.log('🎯 Using skill-specific template:', actualExerciseType);
+        }
       }
       
       const template = EXERCISE_TEMPLATES[actualExerciseType] || EXERCISE_TEMPLATES[exerciseType];
@@ -677,8 +1082,14 @@ export class AIService {
           
           const exerciseContent = await this.generateExercise(exerciseType, context);
           
+          // Determine exercise subtype based on type and lesson skill focus
+          const skillFocus = lesson.skill_focus || ['vocabulary'];
+          const primarySkill = skillFocus[0];
+          const exerciseSubtype = `${primarySkill}_${exerciseType}`;
+          
           exercises.push({
             type: exerciseType,
+            exercise_subtype: exerciseSubtype,
             content: exerciseContent,
             vocabulary: vocabulary,
             sortOrder: exercises.length + 1

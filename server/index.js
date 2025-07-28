@@ -25,8 +25,9 @@ import { vocabularyTypeDefs, vocabularyResolvers } from './graphql/vocabulary.js
 import { aiGenerationTypeDefs, aiGenerationResolvers } from './graphql/aiGeneration.js';
 import { contentMutationTypeDefs, contentMutationResolvers } from './graphql/contentManagement.js';
 import { challengeTypeDefs, challengeResolvers } from './graphql/challenges.js';
-import { authUtils } from './utils/auth.js';
+import { authenticateUser } from './utils/auth.js';
 import { learnmapTypeDefs, learnmapResolvers } from './graphql/learnmap.js';
+import { exerciseCRUDTypeDefs, exerciseCRUDResolvers } from './graphql/exerciseCRUD.js';
 
 const progressTypeDefs = `
   type UserVocabularyProgress {
@@ -109,6 +110,7 @@ const schema = createSchema({
     ${challengeTypeDefs}
     ${progressTypeDefs}
     ${learnmapTypeDefs}
+    ${exerciseCRUDTypeDefs}
   `,
   resolvers: {
     Query: {
@@ -117,6 +119,7 @@ const schema = createSchema({
       ...authResolvers.Query,
       ...courseResolvers.Query,
       ...vocabularyResolvers.Query,
+      ...exerciseCRUDResolvers.Query,
       ...aiGenerationResolvers.Query,
       ...challengeResolvers.Query,
       ...learnmapResolvers.Query,
@@ -140,6 +143,7 @@ const schema = createSchema({
       ...authResolvers.Mutation,
       ...courseResolvers.Mutation,
       ...vocabularyResolvers.Mutation,
+      ...exerciseCRUDResolvers.Mutation,
       ...aiGenerationResolvers.Mutation,
       ...contentMutationResolvers.Mutation,
       ...challengeResolvers.Mutation,
@@ -197,14 +201,31 @@ const yoga = createYoga({
   schema,
   context: async ({ request }) => {
     try {
-      // Extract user from JWT token - FIXED with db parameter
-      const user = await authUtils.getUserFromRequest(request, db); // ← FIXED
+      console.log('🔍 Creating context...');
+      console.log('🔍 Request headers:', request.headers);
       
-      return {
+      // Extract user from JWT token
+      const decoded = await authenticateUser(request);
+      console.log('🔍 Decoded token:', decoded);
+      
+      let user = null;
+      if (decoded && decoded.userId) {
+        // Get user from database
+        user = await db.users.findById(decoded.userId);
+        console.log('🔍 Found user:', user ? user.username : 'null');
+        if (user && !user.isActive) {
+          user = null; // Deactivated users cannot access
+        }
+      }
+      
+      const context = {
         db,
-        user,
+        user: user ? { userId: user._id.toString(), ...user } : null,
         request,
       };
+      
+      console.log('🔍 Context user:', context.user ? context.user.username : 'null');
+      return context;
     } catch (error) {
       console.error('❌ Context creation error:', error.message);
       return {
