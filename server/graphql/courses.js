@@ -826,7 +826,7 @@ export const courseResolvers = {
             content: contentString,
             prompt_template: promptTemplate,
             id: exerciseObj._id.toString(),
-            courseId: exerciseObj.courseId.toString(),
+            courseId: exerciseObj.courseId.toString() ,
             unitId: exerciseObj.unitId.toString(),
             lessonId: exerciseObj.lessonId.toString(),
             createdBy: exerciseObj.createdBy && exerciseObj.createdBy.username ? exerciseObj.createdBy : null,
