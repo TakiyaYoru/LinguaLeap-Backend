@@ -361,10 +361,33 @@ export const learnmapResolvers = {
         // Serialize exercises và convert content field thành JSON string
         const serializedExercises = exercises.map(ex => {
           const exerciseObj = ex.toObject();
-          // Convert content object to JSON string if it's an object
+          
+          // Handle content field - ensure it's never null
+          let contentString = '{}'; // Default fallback
+          
           if (exerciseObj.content && typeof exerciseObj.content === 'object') {
-            exerciseObj.content = JSON.stringify(exerciseObj.content);
+            try {
+              contentString = JSON.stringify(exerciseObj.content);
+            } catch (error) {
+              console.warn(`⚠️ Error stringifying content for exercise ${exerciseObj._id}:`, error);
+              contentString = '{}';
+            }
+          } else if (exerciseObj.content && typeof exerciseObj.content === 'string') {
+            contentString = exerciseObj.content;
+          } else {
+            // If content is null/undefined/empty, use empty object
+            contentString = '{}';
           }
+          
+          // Ensure content is never null/undefined
+          exerciseObj.content = contentString;
+          
+          console.log(`🔍 [getExercisesByLesson] Exercise ${exerciseObj._id}:`, {
+            type: exerciseObj.type,
+            content: exerciseObj.content,
+            contentType: typeof exerciseObj.content
+          });
+          
           return exerciseObj;
         });
 

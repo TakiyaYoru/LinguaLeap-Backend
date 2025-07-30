@@ -708,11 +708,32 @@ export const contentMutationResolvers = {
       try {
         console.log('🎮 Creating new exercise:', input.type);
 
+        // Parse content if it's a JSON string
+        let parsedContent = {};
+        if (input.content) {
+          try {
+            parsedContent = typeof input.content === 'string' 
+              ? JSON.parse(input.content) 
+              : input.content;
+          } catch (parseError) {
+            console.error('❌ Error parsing content JSON:', parseError);
+            // Use empty object as fallback
+            parsedContent = {};
+          }
+        }
+
         const exerciseData = {
           ...input,
+          content: parsedContent, // Use parsed content
           createdBy: user.userId,
           isActive: true
         };
+
+        console.log('📝 Exercise data:', {
+          type: exerciseData.type,
+          content: exerciseData.content,
+          contentType: typeof exerciseData.content
+        });
 
         const exercise = await db.exercises.create(exerciseData, user.userId);
         return exercise;

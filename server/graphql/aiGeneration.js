@@ -71,6 +71,7 @@ export const aiGenerationTypeDefs = `
     lesson_context: String
     situation: String
     user_level: String
+    topic: String
   }
 
   extend type Query {
@@ -206,7 +207,8 @@ export const aiGenerationResolvers = {
           situation: context.situation || 'general',
           user_level: userLevel,
           user_context: context.user_context || '',
-          skill_focus: context.skill_focus || null
+          skill_focus: context.skill_focus || null,
+          topic: context.topic || ''
         };
 
         console.log('📝 Parsed context:', contextObj);

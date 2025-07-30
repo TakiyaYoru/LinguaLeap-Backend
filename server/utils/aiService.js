@@ -422,37 +422,58 @@ JSON format:
 
   listening: {
     system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
-Bạn tạo bài tập listening (nghe và chọn/viết) phù hợp văn hóa Việt Nam.`,
+Bạn tạo bài tập listening (nghe và chọn/viết) phù hợp văn hóa Việt Nam với focus vào kỹ năng nghe hiểu.`,
     
     main_prompt: `Dựa trên yêu cầu: "{user_context}"
+Skill Focus: {skill_focus || 'listening'}
+Chủ đề: {topic || 'general'}
 
 Tạo bài tập listening cho người học tiếng Anh.
     
-Yêu cầu:
+Yêu cầu chung:
 - Câu/đoạn audio ngắn gọn, rõ ràng, phù hợp level {user_level}
 - Nội dung thực tế, dễ hiểu cho người Việt
 - Có thể là câu hỏi, câu trả lời, hoặc đoạn hội thoại ngắn
 - Từ vựng phù hợp với trình độ
 - Nếu có từ vựng cụ thể, sử dụng từ đó trong audio
 
+Yêu cầu cụ thể cho Listening:
+- Audio text 3-15 từ, phù hợp level {user_level}
+- Câu hỏi rõ ràng về nội dung audio
+- 4 đáp án: 1 đúng, 3 sai hợp lý nhưng rõ ràng sai
+- Transcription chính xác để học viên đối chiếu
+- Tập trung vào comprehension, discrimination, hoặc intonation
+- Nếu có từ vựng cụ thể, sử dụng từ đó làm từ khóa chính
+
 QUAN TRỌNG - JSON RULES:
 - Chỉ trả về JSON hợp lệ, không có text khác
 - KHÔNG sử dụng dấu ngoặc kép trong feedback content
 - Thay dấu ngoặc kép bằng từ ngữ mô tả
 - Feedback ngắn gọn, tránh ký tự đặc biệt
+- Audio text phải ngắn gọn, dễ phát âm
 
 JSON format:
 {
-  "audio_text": "Nội dung audio bằng tiếng Anh (sẽ được chuyển thành speech)",
+  "audio_text": "Nội dung audio bằng tiếng Anh (3-15 từ, sẽ được chuyển thành speech)",
   "question": "Câu hỏi về nội dung audio",
   "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
   "correctAnswer": 0,
   "transcription": "Bản ghi chính xác của audio",
   "feedback": {
-    "correct": "Đúng rồi! Bạn đã nghe đúng",
+    "correct": "Đúng rồi! Bạn đã nghe đúng nội dung",
     "incorrect": "Sai rồi, hãy nghe lại kỹ hơn",
     "hint": "Gợi ý về từ khóa trong audio"
-  }
+  },
+  "listening_focus": {
+    "audio_content": "Mô tả nội dung audio",
+    "listening_skill": "comprehension",
+    "audio_length": "3-5 seconds",
+    "difficulty": "{user_level}",
+    "key_words": ["từ khóa 1", "từ khóa 2"],
+    "pronunciation_hints": "Gợi ý phát âm nếu cần"
+  },
+  "skill_focus": "{skill_focus || 'listening'}",
+  "topic": "{topic || 'general'}"
 }`,
     
     expected_output_format: {
@@ -465,7 +486,17 @@ JSON format:
         correct: "string",
         incorrect: "string",
         hint: "string"
-      }
+      },
+      listening_focus: {
+        audio_content: "string",
+        listening_skill: "string",
+        audio_length: "string",
+        difficulty: "string",
+        key_words: ["string1", "string2"],
+        pronunciation_hints: "string"
+      },
+      skill_focus: "string",
+      topic: "string"
     },
     
     fallback_template: {
@@ -478,7 +509,243 @@ JSON format:
         correct: "Correct! The person asked how are you today.",
         incorrect: "Not quite right. Listen carefully to the question.",
         hint: "Focus on the question part of the sentence."
-      }
+      },
+      listening_focus: {
+        audio_content: "A person greeting and asking about well-being",
+        listening_skill: "comprehension",
+        audio_length: "3 seconds",
+        difficulty: "beginner",
+        key_words: ["hello", "how", "are", "you"],
+        pronunciation_hints: "Stress on 'how' and 'you'"
+      },
+      skill_focus: "listening",
+      topic: "greetings"
+    }
+  },
+
+  // LISTENING - Vocabulary Focus
+  listening_vocabulary: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập listening tập trung vào từ vựng (Vocabulary).`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+Skill Focus: Vocabulary
+Chủ đề: {topic}
+
+Tạo bài tập listening tập trung vào kiểm tra từ vựng.
+
+Yêu cầu cụ thể cho Vocabulary Listening:
+- Audio text chứa từ vựng cụ thể cần kiểm tra
+- Câu hỏi về nghĩa, cách sử dụng, hoặc từ loại của từ
+- Từ vựng phù hợp level {user_level}
+- Có thể kiểm tra từ đồng nghĩa, trái nghĩa
+- Phân biệt từ có phát âm tương tự
+- Nếu có từ vựng cụ thể, sử dụng từ đó làm từ khóa chính
+
+QUAN TRỌNG - JSON RULES:
+- Chỉ trả về JSON hợp lệ, không có text khác
+- KHÔNG sử dụng dấu ngoặc kép trong feedback content
+- Tập trung vào từ vựng trong audio
+
+JSON format:
+{
+  "audio_text": "Nội dung audio chứa từ vựng cần kiểm tra",
+  "question": "Câu hỏi về từ vựng trong audio",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "transcription": "Bản ghi chính xác của audio",
+  "feedback": {
+    "correct": "Đúng rồi! Giải thích về từ vựng",
+    "incorrect": "Sai rồi! Giải thích về từ vựng",
+    "hint": "Gợi ý về từ vựng"
+  },
+  "listening_focus": {
+    "audio_content": "Mô tả nội dung audio",
+    "listening_skill": "vocabulary_recognition",
+    "audio_length": "3-5 seconds",
+    "difficulty": "{user_level}",
+    "key_words": ["từ vựng chính"],
+    "pronunciation_hints": "Gợi ý phát âm từ vựng"
+  },
+  "vocabulary_focus": {
+    "target_word": "Từ vựng chính được kiểm tra",
+    "word_type": "noun/verb/adjective/adverb",
+    "word_meaning": "Nghĩa của từ",
+    "difficulty": "{user_level}"
+  },
+  "skill_focus": "vocabulary",
+  "topic": "{topic}"
+}`,
+    
+    expected_output_format: {
+      audio_text: "string",
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      transcription: "string",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      },
+      listening_focus: {
+        audio_content: "string",
+        listening_skill: "string",
+        audio_length: "string",
+        difficulty: "string",
+        key_words: ["string1"],
+        pronunciation_hints: "string"
+      },
+      vocabulary_focus: {
+        target_word: "string",
+        word_type: "string",
+        word_meaning: "string",
+        difficulty: "string"
+      },
+      skill_focus: "vocabulary",
+      topic: "string"
+    },
+    
+    fallback_template: {
+      audio_text: "I love eating apples.",
+      question: "What fruit does the person mention?",
+      options: ["apples", "bananas", "oranges", "grapes"],
+      correctAnswer: 0,
+      transcription: "I love eating apples.",
+      feedback: {
+        correct: "Correct! The person mentioned apples.",
+        incorrect: "Not quite right. Listen to the fruit mentioned.",
+        hint: "Focus on the fruit word in the sentence."
+      },
+      listening_focus: {
+        audio_content: "A person talking about their favorite fruit",
+        listening_skill: "vocabulary_recognition",
+        audio_length: "3 seconds",
+        difficulty: "beginner",
+        key_words: ["apples"],
+        pronunciation_hints: "Stress on 'ap' in apples"
+      },
+      vocabulary_focus: {
+        target_word: "apples",
+        word_type: "noun",
+        word_meaning: "quả táo",
+        difficulty: "beginner"
+      },
+      skill_focus: "vocabulary",
+      topic: "food"
+    }
+  },
+
+  // LISTENING - Grammar Focus
+  listening_grammar: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập listening tập trung vào ngữ pháp (Grammar).`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+Skill Focus: Grammar
+Chủ đề: {topic}
+
+Tạo bài tập listening tập trung vào kiểm tra ngữ pháp.
+
+Yêu cầu cụ thể cho Grammar Listening:
+- Audio text chứa cấu trúc ngữ pháp cần kiểm tra
+- Câu hỏi về thì động từ, cấu trúc câu, từ loại
+- Ngữ pháp phù hợp level {user_level}
+- Có thể kiểm tra thì quá khứ, hiện tại, tương lai
+- Phân biệt cấu trúc câu đúng/sai
+- Nếu có từ vựng cụ thể, sử dụng trong cấu trúc ngữ pháp phù hợp
+
+QUAN TRỌNG - JSON RULES:
+- Chỉ trả về JSON hợp lệ, không có text khác
+- KHÔNG sử dụng dấu ngoặc kép trong feedback content
+- Tập trung vào ngữ pháp trong audio
+
+JSON format:
+{
+  "audio_text": "Nội dung audio chứa cấu trúc ngữ pháp cần kiểm tra",
+  "question": "Câu hỏi về ngữ pháp trong audio",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "transcription": "Bản ghi chính xác của audio",
+  "feedback": {
+    "correct": "Đúng rồi! Giải thích về ngữ pháp",
+    "incorrect": "Sai rồi! Giải thích về ngữ pháp",
+    "hint": "Gợi ý về ngữ pháp"
+  },
+  "listening_focus": {
+    "audio_content": "Mô tả nội dung audio",
+    "listening_skill": "grammar_recognition",
+    "audio_length": "3-5 seconds",
+    "difficulty": "{user_level}",
+    "key_words": ["từ khóa ngữ pháp"],
+    "pronunciation_hints": "Gợi ý phát âm"
+  },
+  "grammar_focus": {
+    "grammar_point": "Điểm ngữ pháp được kiểm tra",
+    "rule_type": "tense/word_order/preposition/article",
+    "example_correct": "Ví dụ câu đúng",
+    "difficulty": "{user_level}"
+  },
+  "skill_focus": "grammar",
+  "topic": "{topic}"
+}`,
+    
+    expected_output_format: {
+      audio_text: "string",
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      transcription: "string",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+      hint: "string"
+      },
+      listening_focus: {
+        audio_content: "string",
+        listening_skill: "string",
+        audio_length: "string",
+        difficulty: "string",
+        key_words: ["string1"],
+        pronunciation_hints: "string"
+      },
+      grammar_focus: {
+        grammar_point: "string",
+        rule_type: "string",
+        example_correct: "string",
+        difficulty: "string"
+      },
+      skill_focus: "grammar",
+      topic: "string"
+    },
+    
+    fallback_template: {
+      audio_text: "I am going to school.",
+      question: "What tense is used in this sentence?",
+      options: ["Present continuous", "Present simple", "Past simple", "Future simple"],
+      correctAnswer: 0,
+      transcription: "I am going to school.",
+      feedback: {
+        correct: "Correct! The sentence uses present continuous tense.",
+        incorrect: "Not quite right. Look at the verb form.",
+        hint: "Notice the 'am' + 'ing' form."
+      },
+      listening_focus: {
+        audio_content: "A person talking about their current action",
+        listening_skill: "grammar_recognition",
+        audio_length: "3 seconds",
+        difficulty: "beginner",
+        key_words: ["am", "going"],
+        pronunciation_hints: "Stress on 'going'"
+      },
+      grammar_focus: {
+        grammar_point: "Present continuous tense",
+        rule_type: "tense",
+        example_correct: "I go to school every day",
+        difficulty: "beginner"
+      },
+      skill_focus: "grammar",
+      topic: "daily_activities"
     }
   },
 
@@ -772,6 +1039,280 @@ JSON format:
     }
   },
 
+  // SPEAKING EXERCISE TEMPLATE - SIMPLIFIED
+  speaking: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập speaking đơn giản: 1 câu/từ để học viên đọc và STT kiểm tra.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+Chủ đề: {topic || 'general'}
+
+Tạo bài tập speaking đơn giản cho người học tiếng Anh.
+    
+Yêu cầu:
+- 1 câu hoặc 1 từ đơn giản, dễ phát âm
+- Phù hợp level {user_level}
+- Nội dung thực tế, dễ hiểu cho người Việt
+- Nếu có từ vựng cụ thể, sử dụng từ đó
+
+QUAN TRỌNG - JSON RULES:
+- Chỉ trả về JSON hợp lệ, không có text khác
+- KHÔNG sử dụng dấu ngoặc kép trong feedback content
+- Đơn giản, ngắn gọn
+
+JSON format:
+{
+  "sentence": "Câu/từ cần nói (1-5 từ)",
+  "instruction": "Đọc câu/từ này",
+  "audio_text": "Nội dung audio mẫu (giống sentence)",
+  "feedback": {
+    "correct": "Tuyệt vời! Phát âm chính xác",
+    "incorrect": "Hãy thử lại",
+    "hint": "Nói chậm và rõ ràng"
+  },
+  "skill_focus": "speaking",
+  "topic": "{topic || 'general'}"
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      instruction: "string",
+      audio_text: "string",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      },
+      skill_focus: "string",
+      topic: "string"
+    },
+    
+    fallback_template: {
+      sentence: "Hello",
+      instruction: "Đọc từ này",
+      audio_text: "Hello",
+      feedback: {
+        correct: "Tuyệt vời! Phát âm chính xác",
+        incorrect: "Hãy thử lại",
+        hint: "Nói chậm và rõ ràng"
+      },
+      skill_focus: "speaking",
+      topic: "greetings"
+    }
+  },
+
+  // SPEAKING - Pronunciation Focus
+  speaking_pronunciation: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập speaking tập trung vào phát âm (Pronunciation).`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+Skill Focus: Pronunciation
+Chủ đề: {topic}
+
+Tạo bài tập speaking tập trung vào luyện phát âm.
+
+Yêu cầu cụ thể cho Pronunciation Speaking:
+- Từ hoặc câu ngắn tập trung vào âm cụ thể
+- Có thể là âm khó với người Việt (th, sh, ch, etc.)
+- Từ vựng phù hợp level {user_level}
+- Có thể có từ đồng âm hoặc gần âm để phân biệt
+- Nếu có từ vựng cụ thể, sử dụng từ đó làm từ khóa chính
+
+QUAN TRỌNG - JSON RULES:
+- Chỉ trả về JSON hợp lệ, không có text khác
+- KHÔNG sử dụng dấu ngoặc kép trong feedback content
+- Tập trung vào phát âm cụ thể
+
+JSON format:
+{
+  "sentence": "Từ/câu cần phát âm",
+  "instruction": "Hướng dẫn luyện phát âm",
+  "pronunciation_tips": "Gợi ý phát âm chi tiết",
+  "audio_text": "Nội dung audio mẫu",
+  "feedback": {
+    "correct": "Tuyệt vời! Phát âm chính xác",
+    "incorrect": "Hãy thử lại, chú ý phát âm",
+    "hint": "Gợi ý phát âm cụ thể"
+  },
+  "speaking_focus": {
+    "speaking_skill": "pronunciation",
+    "difficulty": "{user_level}",
+    "key_words": ["từ khóa phát âm"],
+    "pronunciation_hints": "Gợi ý phát âm chi tiết",
+    "practice_tips": "Mẹo luyện tập phát âm"
+  },
+  "pronunciation_focus": {
+    "target_sound": "Âm cần luyện tập",
+    "sound_type": "consonant/vowel/diphthong",
+    "common_errors": "Lỗi phát âm thường gặp",
+    "difficulty": "{user_level}"
+  },
+  "skill_focus": "pronunciation",
+  "topic": "{topic}"
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      instruction: "string",
+      pronunciation_tips: "string",
+      audio_text: "string",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      },
+      speaking_focus: {
+        speaking_skill: "string",
+        difficulty: "string",
+        key_words: ["string1"],
+        pronunciation_hints: "string",
+        practice_tips: "string"
+      },
+      pronunciation_focus: {
+        target_sound: "string",
+        sound_type: "string",
+        common_errors: "string",
+        difficulty: "string"
+      },
+      skill_focus: "pronunciation",
+      topic: "string"
+    },
+    
+    fallback_template: {
+      sentence: "Thank you",
+      instruction: "Luyện phát âm từ 'thank' với âm 'th'",
+      pronunciation_tips: "Đặt lưỡi giữa răng trên và dưới, thổi hơi",
+      audio_text: "Thank you",
+      feedback: {
+        correct: "Tuyệt vời! Âm 'th' rất chính xác",
+        incorrect: "Hãy thử lại, chú ý âm 'th'",
+        hint: "Đặt lưỡi giữa răng và thổi hơi"
+      },
+      speaking_focus: {
+        speaking_skill: "pronunciation",
+        difficulty: "beginner",
+        key_words: ["thank"],
+        pronunciation_hints: "Âm 'th' như trong 'think'",
+        practice_tips: "Luyện tập âm 'th' trước gương"
+      },
+      pronunciation_focus: {
+        target_sound: "th",
+        sound_type: "consonant",
+        common_errors: "Phát âm như 't' hoặc 'd'",
+        difficulty: "beginner"
+      },
+      skill_focus: "pronunciation",
+      topic: "polite_expressions"
+    }
+  },
+
+  // SPEAKING - Fluency Focus
+  speaking_fluency: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập speaking tập trung vào fluency (lưu loát).`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+Skill Focus: Fluency
+Chủ đề: {topic}
+
+Tạo bài tập speaking tập trung vào luyện fluency.
+
+Yêu cầu cụ thể cho Fluency Speaking:
+- Câu hoặc đoạn ngắn để luyện nói lưu loát
+- Tập trung vào tốc độ nói và ngữ điệu tự nhiên
+- Nội dung thực tế, dễ hiểu
+- Có thể là câu hỏi-đáp hoặc đoạn hội thoại ngắn
+- Nếu có từ vựng cụ thể, sử dụng từ đó
+
+QUAN TRỌNG - JSON RULES:
+- Chỉ trả về JSON hợp lệ, không có text khác
+- KHÔNG sử dụng dấu ngoặc kép trong feedback content
+- Tập trung vào fluency và ngữ điệu
+
+JSON format:
+{
+  "sentence": "Câu/đoạn cần nói lưu loát",
+  "instruction": "Hướng dẫn luyện fluency",
+  "pronunciation_tips": "Gợi ý ngữ điệu và tốc độ",
+  "audio_text": "Nội dung audio mẫu",
+  "feedback": {
+    "correct": "Tuyệt vời! Nói rất lưu loát",
+    "incorrect": "Hãy thử lại, chú ý tốc độ và ngữ điệu",
+    "hint": "Gợi ý về fluency"
+  },
+  "speaking_focus": {
+    "speaking_skill": "fluency",
+    "difficulty": "{user_level}",
+    "key_words": ["từ khóa"],
+    "pronunciation_hints": "Gợi ý ngữ điệu",
+    "practice_tips": "Mẹo luyện fluency"
+  },
+  "fluency_focus": {
+    "target_speed": "Tốc độ mục tiêu",
+    "intonation_pattern": "Mẫu ngữ điệu",
+    "practice_method": "Phương pháp luyện tập",
+    "difficulty": "{user_level}"
+  },
+  "skill_focus": "fluency",
+  "topic": "{topic}"
+}`,
+    
+    expected_output_format: {
+      sentence: "string",
+      instruction: "string",
+      pronunciation_tips: "string",
+      audio_text: "string",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      },
+      speaking_focus: {
+        speaking_skill: "string",
+        difficulty: "string",
+        key_words: ["string1"],
+        pronunciation_hints: "string",
+        practice_tips: "string"
+      },
+      fluency_focus: {
+        target_speed: "string",
+        intonation_pattern: "string",
+        practice_method: "string",
+        difficulty: "string"
+      },
+      skill_focus: "fluency",
+      topic: "string"
+    },
+    
+    fallback_template: {
+      sentence: "What's your name?",
+      instruction: "Luyện nói câu hỏi này một cách tự nhiên",
+      pronunciation_tips: "Lên giọng cuối câu và nói với tốc độ vừa phải",
+      audio_text: "What's your name?",
+      feedback: {
+        correct: "Tuyệt vời! Ngữ điệu rất tự nhiên",
+        incorrect: "Hãy thử lại, chú ý lên giọng cuối câu",
+        hint: "Tập trung vào ngữ điệu của câu hỏi"
+      },
+      speaking_focus: {
+        speaking_skill: "fluency",
+        difficulty: "beginner",
+        key_words: ["what", "name"],
+        pronunciation_hints: "Lên giọng cuối câu hỏi",
+        practice_tips: "Luyện tập với tốc độ chậm trước"
+      },
+      fluency_focus: {
+        target_speed: "vừa phải",
+        intonation_pattern: "rising at the end",
+        practice_method: "shadowing technique",
+        difficulty: "beginner"
+      },
+      skill_focus: "fluency",
+      topic: "introductions"
+    }
+  },
+
   // Keep other existing templates...
   translation: {
     system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
@@ -948,6 +1489,22 @@ export class AIService {
           actualExerciseType = `true_false_${skillFocus}`;
           console.log('🎯 Using skill-specific true/false template:', actualExerciseType);
         }
+      } else if (exerciseType === 'listening' && parsedContext.skill_focus) {
+        const skillFocus = Array.isArray(parsedContext.skill_focus) 
+          ? parsedContext.skill_focus[0] 
+          : parsedContext.skill_focus;
+        if (['vocabulary', 'grammar'].includes(skillFocus)) {
+          actualExerciseType = `listening_${skillFocus}`;
+          console.log('🎯 Using skill-specific listening template:', actualExerciseType);
+        }
+      } else if (exerciseType === 'speaking' && parsedContext.skill_focus) {
+        const skillFocus = Array.isArray(parsedContext.skill_focus) 
+          ? parsedContext.skill_focus[0] 
+          : parsedContext.skill_focus;
+        if (['pronunciation', 'fluency'].includes(skillFocus)) {
+          actualExerciseType = `speaking_${skillFocus}`;
+          console.log('🎯 Using skill-specific speaking template:', actualExerciseType);
+        }
       }
       
       const template = EXERCISE_TEMPLATES[actualExerciseType] || EXERCISE_TEMPLATES[exerciseType];
@@ -1097,6 +1654,30 @@ export class AIService {
         }
         
         return baseValid;
+      } else if (exerciseType === 'speaking' || exerciseType.startsWith('speaking_')) {
+        return exerciseData.sentence &&
+               exerciseData.instruction &&
+               exerciseData.pronunciation_tips &&
+               exerciseData.audio_text &&
+               exerciseData.feedback &&
+               exerciseData.feedback.correct &&
+               exerciseData.feedback.incorrect;
+      } else if (exerciseType === 'speaking_pronunciation') {
+        return exerciseData.sentence &&
+               exerciseData.instruction &&
+               exerciseData.pronunciation_tips &&
+               exerciseData.audio_text &&
+               exerciseData.feedback &&
+               exerciseData.feedback.correct &&
+               exerciseData.feedback.incorrect;
+      } else if (exerciseType === 'speaking_fluency') {
+        return exerciseData.sentence &&
+               exerciseData.instruction &&
+               exerciseData.pronunciation_tips &&
+               exerciseData.audio_text &&
+               exerciseData.feedback &&
+               exerciseData.feedback.correct &&
+               exerciseData.feedback.incorrect;
       } else if (exerciseType === 'translation') {
         return exerciseData.sourceText && 
                exerciseData.targetText &&
@@ -1121,6 +1702,12 @@ export class AIService {
       template = EXERCISE_TEMPLATES['fill_blank'];
     } else if (!template && exerciseType.startsWith('true_false_')) {
       template = EXERCISE_TEMPLATES['true_false'];
+    } else if (!template && exerciseType.startsWith('speaking_')) {
+      template = EXERCISE_TEMPLATES['speaking'];
+    } else if (!template && exerciseType.startsWith('speaking_pronunciation')) {
+      template = EXERCISE_TEMPLATES['speaking_pronunciation'];
+    } else if (!template && exerciseType.startsWith('speaking_fluency')) {
+      template = EXERCISE_TEMPLATES['speaking_fluency'];
     }
     
     if (!template) {
@@ -1162,6 +1749,72 @@ export class AIService {
           result.isTrue = false;
           result.feedback.correct = "Đúng rồi! Số sau five (5) là six (6), không phải seven (7).";
           result.feedback.hint = "Hãy đếm từ một đến mười.";
+        }
+      } else if (exerciseType === 'speaking') {
+        if (context.user_context.includes('chào hỏi') || context.user_context.includes('greeting')) {
+          result.sentence = "Hello, how are you?";
+          result.instruction = "Lặp lại câu chào hỏi này với phát âm chính xác";
+          result.pronunciation_tips = "Nhấn mạnh vào 'how' và 'you'";
+          result.audio_text = "Hello, how are you?";
+          result.feedback.correct = "Tuyệt vời! Phát âm của bạn rất tự nhiên";
+          result.feedback.incorrect = "Hãy thử lại, chú ý nhấn mạnh từ 'how'";
+          result.feedback.hint = "Tập trung vào ngữ điệu của câu hỏi";
+          result.speaking_focus.speaking_skill = "pronunciation";
+          result.speaking_focus.difficulty = "beginner";
+          result.speaking_focus.key_words = ["hello", "how", "are", "you"];
+          result.speaking_focus.pronunciation_hints = "Nhấn mạnh 'how' và lên giọng cuối câu";
+          result.speaking_focus.practice_tips = "Luyện tập từng từ một, sau đó nói cả câu";
+        } else if (context.user_context.includes('số đếm')) {
+          result.sentence = "I have three apples.";
+          result.instruction = "Luyện nói câu này một cách tự nhiên";
+          result.pronunciation_tips = "Lên giọng cuối câu và nói với tốc độ vừa phải";
+          result.audio_text = "I have three apples.";
+          result.feedback.correct = "Tuyệt vời! Ngữ điệu rất tự nhiên";
+          result.feedback.incorrect = "Hãy thử lại, chú ý lên giọng cuối câu";
+          result.feedback.hint = "Tập trung vào ngữ điệu của câu";
+          result.speaking_focus.speaking_skill = "fluency";
+          result.speaking_focus.difficulty = "beginner";
+          result.speaking_focus.key_words = ["i", "have", "three", "apples"];
+          result.speaking_focus.pronunciation_hints = "Lên giọng cuối câu hỏi";
+          result.speaking_focus.practice_tips = "Luyện tập với tốc độ chậm trước";
+        }
+      } else if (exerciseType === 'speaking_pronunciation') {
+        if (context.user_context.includes('số đếm')) {
+          result.sentence = "Thank you";
+          result.instruction = "Luyện phát âm từ 'thank' với âm 'th'";
+          result.pronunciation_tips = "Đặt lưỡi giữa răng trên và dưới, thổi hơi";
+          result.audio_text = "Thank you";
+          result.feedback.correct = "Tuyệt vời! Âm 'th' rất chính xác";
+          result.feedback.incorrect = "Hãy thử lại, chú ý âm 'th'";
+          result.feedback.hint = "Đặt lưỡi giữa răng và thổi hơi";
+          result.speaking_focus.speaking_skill = "pronunciation";
+          result.speaking_focus.difficulty = "beginner";
+          result.speaking_focus.key_words = ["thank"];
+          result.speaking_focus.pronunciation_hints = "Âm 'th' như trong 'think'";
+          result.speaking_focus.practice_tips = "Luyện tập âm 'th' trước gương";
+          result.pronunciation_focus.target_sound = "th";
+          result.pronunciation_focus.sound_type = "consonant";
+          result.pronunciation_focus.common_errors = "Phát âm như 't' hoặc 'd'";
+          result.pronunciation_focus.difficulty = "beginner";
+        }
+      } else if (exerciseType === 'speaking_fluency') {
+        if (context.user_context.includes('chào hỏi')) {
+          result.sentence = "What's your name?";
+          result.instruction = "Luyện nói câu hỏi này một cách tự nhiên";
+          result.pronunciation_tips = "Lên giọng cuối câu và nói với tốc độ vừa phải";
+          result.audio_text = "What's your name?";
+          result.feedback.correct = "Tuyệt vời! Ngữ điệu rất tự nhiên";
+          result.feedback.incorrect = "Hãy thử lại, chú ý lên giọng cuối câu";
+          result.feedback.hint = "Tập trung vào ngữ điệu của câu hỏi";
+          result.speaking_focus.speaking_skill = "fluency";
+          result.speaking_focus.difficulty = "beginner";
+          result.speaking_focus.key_words = ["what", "name"];
+          result.speaking_focus.pronunciation_hints = "Lên giọng cuối câu hỏi";
+          result.speaking_focus.practice_tips = "Luyện tập với tốc độ chậm trước";
+          result.fluency_focus.target_speed = "vừa phải";
+          result.fluency_focus.intonation_pattern = "rising at the end";
+          result.fluency_focus.practice_method = "shadowing technique";
+          result.fluency_focus.difficulty = "beginner";
         }
       } else if (exerciseType === 'translation') {
         if (context.user_context.includes('chào hỏi')) {
@@ -1311,6 +1964,30 @@ export class AIService {
     } else if (exerciseType === 'true_false' || exerciseType.startsWith('true_false_')) {
       return content.statement && 
              typeof content.isTrue === 'boolean' &&
+             content.feedback &&
+             content.feedback.correct &&
+             content.feedback.incorrect;
+         } else if (exerciseType === 'speaking' || exerciseType.startsWith('speaking_')) {
+       return content.sentence &&
+              content.instruction &&
+              content.pronunciation_tips &&
+              content.audio_text &&
+              content.feedback &&
+              content.feedback.correct &&
+              content.feedback.incorrect;
+     } else if (exerciseType === 'speaking_pronunciation') {
+       return content.sentence &&
+              content.instruction &&
+              content.pronunciation_tips &&
+              content.audio_text &&
+              content.feedback &&
+              content.feedback.correct &&
+              content.feedback.incorrect;
+     } else if (exerciseType === 'speaking_fluency') {
+       return content.sentence &&
+              content.instruction &&
+              content.pronunciation_tips &&
+              content.audio_text &&
              content.feedback &&
              content.feedback.correct &&
              content.feedback.incorrect;
