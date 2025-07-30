@@ -280,7 +280,7 @@ export const aiGenerationResolvers = {
 
         return {
           exerciseId: null,
-          audioUrl: `/uploads/audio/${path.basename(audioResult)}`,
+          audioUrl: audioResult, // Firebase URL
           text: input.text,
           filePath: audioResult
         };

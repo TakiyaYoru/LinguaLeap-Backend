@@ -28,6 +28,9 @@ import { challengeTypeDefs, challengeResolvers } from './graphql/challenges.js';
 import { authUtils } from './utils/auth.js';
 import { learnmapTypeDefs, learnmapResolvers } from './graphql/learnmap.js';
 
+// Import Firebase service
+import { FirebaseService } from './utils/firebaseService.js';
+
 const progressTypeDefs = `
   type UserVocabularyProgress {
     id: ID!
@@ -236,6 +239,9 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Static files serving for uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Static files endpoint (for future file uploads)
 app.get("/files/:filename", (req, res) => {
   const filename = req.params.filename;
@@ -271,8 +277,15 @@ const startServer = async () => {
     // Connect to database
     await connectDB();
     
+    // Initialize Firebase
+    if (FirebaseService.isInitialized()) {
+      console.log('🔥 Firebase initialized successfully');
+    } else {
+      console.log('⚠️ Firebase not initialized - audio features may be limited');
+    }
+    
     // Start Express server
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log('\n🎉 =====================================');
       console.log('   LINGUALEAP BACKEND SERVER STARTED');
       console.log('🎉 =====================================');

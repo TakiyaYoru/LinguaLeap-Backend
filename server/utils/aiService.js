@@ -418,15 +418,66 @@ JSON format:
         hint: "string"
       }
     },
+  },
+
+  listening: {
+    system_context: `Bạn là giáo viên tiếng Anh chuyên nghiệp cho người Việt Nam level {user_level}.
+Bạn tạo bài tập listening (nghe và chọn/viết) phù hợp văn hóa Việt Nam.`,
+    
+    main_prompt: `Dựa trên yêu cầu: "{user_context}"
+
+Tạo bài tập listening cho người học tiếng Anh.
+    
+Yêu cầu:
+- Câu/đoạn audio ngắn gọn, rõ ràng, phù hợp level {user_level}
+- Nội dung thực tế, dễ hiểu cho người Việt
+- Có thể là câu hỏi, câu trả lời, hoặc đoạn hội thoại ngắn
+- Từ vựng phù hợp với trình độ
+- Nếu có từ vựng cụ thể, sử dụng từ đó trong audio
+
+QUAN TRỌNG - JSON RULES:
+- Chỉ trả về JSON hợp lệ, không có text khác
+- KHÔNG sử dụng dấu ngoặc kép trong feedback content
+- Thay dấu ngoặc kép bằng từ ngữ mô tả
+- Feedback ngắn gọn, tránh ký tự đặc biệt
+
+JSON format:
+{
+  "audio_text": "Nội dung audio bằng tiếng Anh (sẽ được chuyển thành speech)",
+  "question": "Câu hỏi về nội dung audio",
+  "options": ["Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"],
+  "correctAnswer": 0,
+  "transcription": "Bản ghi chính xác của audio",
+  "feedback": {
+    "correct": "Đúng rồi! Bạn đã nghe đúng",
+    "incorrect": "Sai rồi, hãy nghe lại kỹ hơn",
+    "hint": "Gợi ý về từ khóa trong audio"
+  }
+}`,
+    
+    expected_output_format: {
+      audio_text: "string",
+      question: "string",
+      options: ["string1", "string2", "string3", "string4"],
+      correctAnswer: "number",
+      transcription: "string",
+      feedback: {
+        correct: "string",
+        incorrect: "string",
+        hint: "string"
+      }
+    },
     
     fallback_template: {
-      sentence: "I say _____ when I meet my friends.",
-      correctAnswer: "hello",
-      alternatives: ["hi", "hey"],
+      audio_text: "Hello, how are you today?",
+      question: "What did the person ask?",
+      options: ["How are you", "What is your name", "Where are you from", "What time is it"],
+      correctAnswer: 0,
+      transcription: "Hello, how are you today?",
       feedback: {
-        correct: "Correct! hello is a common greeting.",
-        incorrect: "Not quite right. Try again!",
-        hint: "Think about common greetings in English."
+        correct: "Correct! The person asked how are you today.",
+        incorrect: "Not quite right. Listen carefully to the question.",
+        hint: "Focus on the question part of the sentence."
       }
     }
   },
@@ -1188,30 +1239,30 @@ export class AIService {
       for (const [exerciseType, count] of Object.entries(generationConfig.exercise_distribution)) {
         for (let i = 0; i < count; i++) {
           try {
-          // Select vocabulary for this exercise
-          const vocabIndex = i % vocabularyList.length;
-          const vocabulary = vocabularyList[vocabIndex];
-          
-          const context = {
-            word: vocabulary.word,
-            meaning: vocabulary.meaning,
-            lesson_context: lesson.lesson_context?.situation || lesson.title,
-            situation: lesson.lesson_context?.situation || 'general',
-            user_level: userLevel
-          };
-          
-          const exerciseContent = await this.generateExercise(exerciseType, context);
-          
-          exercises.push({
-            type: exerciseType,
-            content: exerciseContent,
-            vocabulary: vocabulary,
-            sortOrder: exercises.length + 1
-          });
+            // Select vocabulary for this exercise
+            const vocabIndex = i % vocabularyList.length;
+            const vocabulary = vocabularyList[vocabIndex];
             
+            const context = {
+              word: vocabulary.word,
+              meaning: vocabulary.meaning,
+              lesson_context: lesson.lesson_context?.situation || lesson.title,
+              situation: lesson.lesson_context?.situation || 'general',
+              user_level: userLevel
+            };
+            
+            const exerciseContent = await this.generateExercise(exerciseType, context);
+            
+            exercises.push({
+              type: exerciseType,
+              content: exerciseContent,
+              vocabulary: vocabulary,
+              sortOrder: exercises.length + 1
+            });
+              
             // Add delay between requests to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+              
           } catch (error) {
             console.error(`❌ Error generating ${exerciseType} exercise ${i + 1}:`, error.message);
             // Continue with next exercise instead of failing completely

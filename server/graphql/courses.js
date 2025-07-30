@@ -963,16 +963,18 @@ export const courseResolvers = {
           };
 
           // Ensure content is a JSON string for lessonExercises
-          let contentString = exerciseObj.content;
-          if (typeof exerciseObj.content === 'object') {
-            try {
-              contentString = JSON.stringify(exerciseObj.content);
-            } catch (error) {
-              console.warn('⚠️ Error stringifying content for exercise:', exerciseObj._id, error.message);
-              contentString = '{}';
+          let contentString = '{}'; // Default fallback
+          if (exerciseObj.content != null) {
+            if (typeof exerciseObj.content === 'object') {
+              try {
+                contentString = JSON.stringify(exerciseObj.content);
+              } catch (error) {
+                console.warn('⚠️ Error stringifying content for exercise:', exerciseObj._id, error.message);
+                contentString = '{}';
+              }
+            } else if (typeof exerciseObj.content === 'string') {
+              contentString = exerciseObj.content;
             }
-          } else if (typeof exerciseObj.content !== 'string') {
-            contentString = '{}';
           }
 
           // Handle prompt_template fields

@@ -6,6 +6,7 @@ import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import { FirebaseService, AUDIO_FOLDERS } from './firebaseService.js';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ const VOICE_CONFIGS = {
 
 const AUDIO_CONFIG = {
   audioEncoding: 'MP3',
+  sampleRateHertz: 44100, // Higher sample rate for better quality
   speakingRate: 0.9, // Slightly slower for learners
   pitch: 0.0,
   volumeGainDb: 0.0
@@ -104,23 +106,24 @@ export class TTSService {
     }
   }
   
-  // Generate audio and save to file
+  // Generate audio and save to file (enhanced with Firebase)
   static async generateAudioFile(text, filename, options = {}) {
     try {
       const audioContent = await this.generateAudio(text, options);
       
-      // Create uploads directory if it doesn't exist
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'audio');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
+      // Always try Firebase first
+      if (FirebaseService.isInitialized()) {
+        try {
+          const result = await FirebaseService.uploadAudioFile(audioContent, filename, AUDIO_FOLDERS.EXERCISES);
+          console.log('✅ Audio uploaded to Firebase:', result.url);
+          return result.url; // Return Firebase URL
+        } catch (firebaseError) {
+          console.error('❌ Firebase upload failed:', firebaseError.message);
+          throw firebaseError; // Don't fallback, throw error
+        }
+      } else {
+        throw new Error('Firebase not initialized');
       }
-      
-      // Save audio file
-      const filePath = path.join(uploadsDir, filename);
-      fs.writeFileSync(filePath, audioContent, 'binary');
-      
-      console.log('💾 Audio file saved:', filePath);
-      return filePath;
       
     } catch (error) {
       console.error('❌ Error saving audio file:', error.message);
@@ -170,12 +173,11 @@ export class TTSService {
         return null;
       }
       
-      const filePath = await this.generateAudioFile(audioText, filename, options);
-      const audioUrl = `/uploads/audio/${filename}`;
+      const audioUrl = await this.generateAudioFile(audioText, filename, options);
       
       return {
         audioUrl,
-        filePath,
+        filePath: audioUrl, // Firebase URL is the file path
         text: audioText
       };
       
