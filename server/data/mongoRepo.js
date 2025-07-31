@@ -166,11 +166,224 @@ const userRepository = {
     }
   },
 
+  // Complete lesson - earn XP and diamonds
+  async completeLesson(userId, lessonId, score = 0) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) return null;
+
+      const xpEarned = 5; // Base XP for lesson completion
+      const diamondsEarned = 10; // Base diamonds for lesson completion
+      
+      // Calculate level up
+      const newTotalXP = user.totalXP + xpEarned;
+      const newLevel = Math.floor(newTotalXP / 100) + 1; // Level up every 100 XP
+      const levelUpBonus = newLevel > user.level ? (newLevel - user.level) * 50 : 0; // 50 diamonds per level
+      
+      const updateData = {
+        $inc: { 
+          totalXP: xpEarned,
+          diamonds: diamondsEarned + levelUpBonus
+        },
+        level: newLevel
+      };
+
+      // Update streak
+      const today = new Date();
+      const lastStudy = user.lastStudyDate;
+      const isStudiedToday = lastStudy && 
+        lastStudy.toDateString() === today.toDateString();
+      
+      let streakUpdate = user.currentStreak;
+      if (!isStudiedToday) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isYesterday = lastStudy && 
+          lastStudy.toDateString() === yesterday.toDateString();
+        
+        if (isYesterday) {
+          streakUpdate += 1;
+        } else {
+          streakUpdate = 1;
+        }
+      }
+
+      updateData.currentStreak = streakUpdate;
+      updateData.longestStreak = Math.max(user.longestStreak, streakUpdate);
+      updateData.lastStudyDate = today;
+
+      const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
+      
+      console.log(`✅ Lesson completed: +${xpEarned} XP, +${diamondsEarned} diamonds, level: ${newLevel}`);
+      if (levelUpBonus > 0) {
+        console.log(`🎉 Level up bonus: +${levelUpBonus} diamonds`);
+      }
+      
+      const { password, ...userWithoutPassword } = updatedUser.toObject();
+      return userWithoutPassword;
+    } catch (error) {
+      console.error('❌ Error completing lesson:', error.message);
+      throw error;
+    }
+  },
+
+  // Complete unit - earn XP and diamonds
+  async completeUnit(userId, unitId, score = 0) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) return null;
+
+      const xpEarned = 20; // Base XP for unit completion
+      const diamondsEarned = 50; // Base diamonds for unit completion
+      
+      // Calculate level up
+      const newTotalXP = user.totalXP + xpEarned;
+      const newLevel = Math.floor(newTotalXP / 100) + 1;
+      const levelUpBonus = newLevel > user.level ? (newLevel - user.level) * 50 : 0;
+      
+      const updateData = {
+        $inc: { 
+          totalXP: xpEarned,
+          diamonds: diamondsEarned + levelUpBonus
+        },
+        level: newLevel
+      };
+
+      // Update streak
+      const today = new Date();
+      const lastStudy = user.lastStudyDate;
+      const isStudiedToday = lastStudy && 
+        lastStudy.toDateString() === today.toDateString();
+      
+      let streakUpdate = user.currentStreak;
+      if (!isStudiedToday) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isYesterday = lastStudy && 
+          lastStudy.toDateString() === yesterday.toDateString();
+        
+        if (isYesterday) {
+          streakUpdate += 1;
+        } else {
+          streakUpdate = 1;
+        }
+      }
+
+      updateData.currentStreak = streakUpdate;
+      updateData.longestStreak = Math.max(user.longestStreak, streakUpdate);
+      updateData.lastStudyDate = today;
+
+      const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true });
+      
+      console.log(`✅ Unit completed: +${xpEarned} XP, +${diamondsEarned} diamonds, level: ${newLevel}`);
+      if (levelUpBonus > 0) {
+        console.log(`🎉 Level up bonus: +${levelUpBonus} diamonds`);
+      }
+      
+      const { password, ...userWithoutPassword } = updatedUser.toObject();
+      return userWithoutPassword;
+    } catch (error) {
+      console.error('❌ Error completing unit:', error.message);
+      throw error;
+    }
+  },
+
+  // Buy hearts with diamonds
+  async buyHearts(userId, heartCount = 1) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) return null;
+
+      const diamondCost = heartCount * 20; // 20 diamonds per heart
+      
+      if (user.diamonds < diamondCost) {
+        throw new Error('Insufficient diamonds');
+      }
+
+      const maxHearts = user.isPremium ? 999 : 5; // Premium users have unlimited hearts
+      const newHearts = Math.min(user.hearts + heartCount, maxHearts);
+
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        {
+          $inc: { diamonds: -diamondCost },
+          hearts: newHearts
+        },
+        { new: true }
+      );
+
+      console.log(`💎 User ${userId} bought ${heartCount} hearts for ${diamondCost} diamonds`);
+      
+      const { password, ...userWithoutPassword } = updatedUser.toObject();
+      return userWithoutPassword;
+    } catch (error) {
+      console.error('❌ Error buying hearts:', error.message);
+      throw error;
+    }
+  },
+
+  // Refill hearts with diamonds (instant refill)
+  async refillHearts(userId) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) return null;
+
+      if (user.hearts >= 5) {
+        return user; // Already full
+      }
+
+      const heartsNeeded = 5 - user.hearts;
+      const diamondCost = heartsNeeded * 10; // 10 diamonds per heart for instant refill
+      
+      if (user.diamonds < diamondCost) {
+        throw new Error('Insufficient diamonds');
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        {
+          $inc: { diamonds: -diamondCost },
+          hearts: 5
+        },
+        { new: true }
+      );
+
+      console.log(`⚡ User ${userId} refilled ${heartsNeeded} hearts for ${diamondCost} diamonds`);
+      
+      const { password, ...userWithoutPassword } = updatedUser.toObject();
+      return userWithoutPassword;
+    } catch (error) {
+      console.error('❌ Error refilling hearts:', error.message);
+      throw error;
+    }
+  },
+
+  // Get leaderboard (top XP users)
+  async getLeaderboard(limit = 50) {
+    try {
+      const users = await User.find({}, 'username displayName totalXP level diamonds currentStreak')
+        .sort({ totalXP: -1, level: -1 })
+        .limit(limit);
+      
+      return users;
+    } catch (error) {
+      console.error('❌ Error getting leaderboard:', error.message);
+      throw error;
+    }
+  },
+
   // Use a heart (for wrong answers)
   async useHeart(id) {
     try {
       const user = await User.findById(id);
       if (!user) return null;
+
+      // Premium users have unlimited hearts
+      if (user.isPremium) {
+        console.log(`💔 Premium user ${id} used a heart (unlimited)`);
+        const { password, ...userWithoutPassword } = user.toObject();
+        return userWithoutPassword;
+      }
 
       if (user.hearts > 0) {
         user.hearts -= 1;

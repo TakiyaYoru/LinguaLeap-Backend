@@ -646,7 +646,83 @@ export const learnmapResolvers = {
         if (!userId) return { success: false, message: 'User ID not found', userLearnmapProgress: null };
         
         let doc = await UserLearnmapProgress.findOne({ userId, courseId });
-        if (!doc) return { success: false, message: 'No progress found for this course', userLearnmapProgress: null };
+        if (!doc) {
+          console.log('⚠️ [updateLearnmapProgress] No progress found, creating new progress...');
+          
+          try {
+            // Use the same logic as learnmapWithContent to create progress
+            const course = await Course.findOne({ _id: courseId, isPublished: true });
+            if (!course) {
+              console.log('❌ [updateLearnmapProgress] Course not found or not published:', courseId);
+              return { success: false, message: 'Course not found or not published', userLearnmapProgress: null };
+            }
+            console.log('✅ [updateLearnmapProgress] Found course:', course.title);
+
+            const units = await Unit.find({ courseId: courseId, isPublished: true }).sort({ sortOrder: 1 });
+            if (!units.length) {
+              console.log('❌ [updateLearnmapProgress] No published units found for course:', courseId);
+              return { success: false, message: 'No published units found for this course', userLearnmapProgress: null };
+            }
+            console.log('✅ [updateLearnmapProgress] Found units:', units.length);
+
+            // Get published lessons for each unit
+            const unitsWithLessons = await Promise.all(units.map(async (unit) => {
+              const lessons = await Lesson.find({ unitId: unit._id, isPublished: true }).sort({ sortOrder: 1 });
+              console.log(`📊 [updateLearnmapProgress] Unit ${unit.title} has ${lessons.length} lessons`);
+              return { unit, lessons };
+            }));
+
+            // Create progress structure
+            const unitProgress = unitsWithLessons.map(({ unit, lessons }, unitIndex) => {
+              console.log(`📊 [updateLearnmapProgress] Unit ${unitIndex}: ${unit.title} (${unit._id})`);
+              console.log(`📊 [updateLearnmapProgress] Unit ${unitIndex} lessons count:`, lessons.length);
+              
+              return {
+                unitId: unit._id,
+                status: unitIndex === 0 ? 'unlocked' : 'locked',
+                completedAt: null,
+                lessonProgress: lessons.map((lesson, lessonIndex) => {
+                  const isUnlocked = (unitIndex === 0 && lessonIndex === 0);
+                  console.log(`📊 [updateLearnmapProgress] Lesson ${lessonIndex}: ${lesson.title} (${lesson._id}) - Status: ${isUnlocked ? 'unlocked' : 'locked'}`);
+                  
+                  return {
+                    lessonId: lesson._id,
+                    status: isUnlocked ? 'unlocked' : 'locked',
+                    completedAt: null,
+                    exerciseProgress: [],
+                  };
+                }),
+              };
+            });
+
+            if (unitProgress.length === 0) {
+              console.log('❌ [updateLearnmapProgress] No valid units with lessons found');
+              return { success: false, message: 'No valid units with lessons found', userLearnmapProgress: null };
+            }
+
+            // Create UserLearnmapProgress
+            console.log('🔧 [updateLearnmapProgress] Creating new progress with data:', {
+              userId,
+              courseId,
+              unitProgressLength: unitProgress.length,
+              hearts: 5
+            });
+            
+            doc = await UserLearnmapProgress.create({
+              userId,
+              courseId,
+              unitProgress,
+              hearts: 5,
+              lastHeartUpdate: new Date(),
+              fastTrackHistory: [],
+            });
+            
+            console.log('✅ [updateLearnmapProgress] Created new progress for user with', unitProgress.length, 'units');
+          } catch (createError) {
+            console.error('❌ [updateLearnmapProgress] Error creating new progress:', createError);
+            return { success: false, message: 'Error creating progress: ' + createError.message, userLearnmapProgress: null };
+          }
+        }
         
         console.log('📊 [updateLearnmapProgress] Found doc:', doc._id);
         console.log('📊 [updateLearnmapProgress] Current unitProgress:', doc.unitProgress.length);
@@ -845,18 +921,25 @@ export const learnmapResolvers = {
         }
         
         if (updated) {
-          console.log('💾 [updateLearnmapProgress] Saving document...');
-          await doc.save();
-          console.log('✅ [updateLearnmapProgress] Document saved successfully');
-          return { success: true, message: 'Progress updated', userLearnmapProgress: doc.toObject() };
+          try {
+            console.log('💾 [updateLearnmapProgress] Saving document...');
+            await doc.save();
+            console.log('✅ [updateLearnmapProgress] Document saved successfully');
+            return { success: true, message: 'Progress updated', userLearnmapProgress: doc.toObject() };
+          } catch (saveError) {
+            console.error('❌ [updateLearnmapProgress] Error saving document:', saveError);
+            return { success: false, message: 'Error saving progress: ' + saveError.message, userLearnmapProgress: null };
+          }
         } else {
           console.log('⚠️ [updateLearnmapProgress] No update performed');
           return { success: false, message: 'No update performed', userLearnmapProgress: doc.toObject() };
         }
       } catch (error) {
-        console.error('[updateLearnmapProgress] Unexpected error:', error);
-        console.error('[updateLearnmapProgress] Error stack:', error.stack);
-        return { success: false, message: 'Internal server error', userLearnmapProgress: null };
+        console.error('❌ [updateLearnmapProgress] Unexpected error:', error);
+        console.error('❌ [updateLearnmapProgress] Error stack:', error.stack);
+        console.error('❌ [updateLearnmapProgress] Error name:', error.name);
+        console.error('❌ [updateLearnmapProgress] Error message:', error.message);
+        return { success: false, message: 'Internal server error: ' + error.message, userLearnmapProgress: null };
       }
     },
     updateExerciseProgress: async (parent, { lessonId, exerciseProgressInput }, context) => {

@@ -48,9 +48,20 @@ export const UserSchema = new Schema(
       enum: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'],
       default: 'A1'
     },
+    // Gamification System
+    level: {
+      type: Number,
+      default: 1,
+      min: 1
+    },
     totalXP: {
       type: Number,
       default: 0
+    },
+    diamonds: {
+      type: Number,
+      default: 0,
+      min: 0
     },
     hearts: {
       type: Number,
@@ -137,6 +148,8 @@ UserSchema.index({ email: 1 });
 UserSchema.index({ username: 1 });
 UserSchema.index({ subscriptionType: 1 });
 UserSchema.index({ currentLevel: 1 });
+UserSchema.index({ level: 1 });
+UserSchema.index({ totalXP: -1 }); // For leaderboard
 
 // Virtual field for premium status
 UserSchema.virtual('isPremium').get(function() {

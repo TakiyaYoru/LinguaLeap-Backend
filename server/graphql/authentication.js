@@ -17,7 +17,9 @@ export const authTypeDefs = `
     displayName: String!
     avatar: String
     currentLevel: String!
+    level: Int!
     totalXP: Int!
+    diamonds: Int!
     hearts: Int!
     currentStreak: Int!
     longestStreak: Int!

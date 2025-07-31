@@ -27,6 +27,7 @@ import { contentMutationTypeDefs, contentMutationResolvers } from './graphql/con
 import { challengeTypeDefs, challengeResolvers } from './graphql/challenges.js';
 import { authUtils } from './utils/auth.js';
 import { learnmapTypeDefs, learnmapResolvers } from './graphql/learnmap.js';
+import { gamificationTypeDefs, gamificationResolvers } from './graphql/gamification.js';
 
 // Import Firebase service
 import { FirebaseService } from './utils/firebaseService.js';
@@ -112,6 +113,7 @@ const schema = createSchema({
     ${challengeTypeDefs}
     ${progressTypeDefs}
     ${learnmapTypeDefs}
+    ${gamificationTypeDefs}
   `,
   resolvers: {
     Query: {
@@ -123,6 +125,7 @@ const schema = createSchema({
       ...aiGenerationResolvers.Query,
       ...challengeResolvers.Query,
       ...learnmapResolvers.Query,
+      ...gamificationResolvers.Query,
       // Progress tracking queries
       myVocabularyProgress: async (parent, args, context) => {
         if (!context.user) throw new Error('Not authenticated');
@@ -147,6 +150,7 @@ const schema = createSchema({
       ...contentMutationResolvers.Mutation,
       ...challengeResolvers.Mutation,
       ...learnmapResolvers.Mutation,
+      ...gamificationResolvers.Mutation,
       // Progress tracking mutations
       upsertVocabularyProgress: async (parent, args, context) => {
         if (!context.user) throw new Error('Not authenticated');
