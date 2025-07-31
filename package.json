@@ -33,6 +33,7 @@
     "express": "^4.18.2",
     "firebase": "^10.1.0",
     "firebase-admin": "^12.7.0",
+    "google-auth-library": "^10.2.0",
     "graphql": "^16.6.0",
     "graphql-upload": "^16.0.2",
     "graphql-yoga": "^4.0.4",

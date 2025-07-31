@@ -4,6 +4,7 @@
 
 import jwt from 'jsonwebtoken';
 import { GraphQLError } from 'graphql';
+import { verifyGoogleToken, generateUsernameFromEmail, generateDisplayName } from '../utils/googleAuthService.js';
 
 // ===============================================
 // TYPE DEFINITIONS
@@ -16,6 +17,7 @@ export const authTypeDefs = `
     email: String!
     displayName: String!
     avatar: String
+    bio: String
     currentLevel: String!
     level: Int!
     totalXP: Int!
@@ -50,6 +52,31 @@ export const authTypeDefs = `
     password: String!
   }
 
+  input UpdateProfileInput {
+    displayName: String
+    email: String
+    bio: String
+    avatarUrl: String
+  }
+
+  type UpdateProfilePayload {
+    success: Boolean!
+    message: String!
+    user: User
+  }
+
+  # Google Auth types
+  input GoogleAuthInput {
+    token: String!
+  }
+
+  type GoogleAuthResponse {
+    success: Boolean!
+    message: String!
+    token: String
+    user: User
+  }
+
   extend type Query {
     # Get current user profile
     me: User
@@ -61,6 +88,12 @@ export const authTypeDefs = `
     
     # Login user
     login(input: LoginInput!): AuthPayload!
+    
+    # Update user profile
+    updateProfile(input: UpdateProfileInput!): UpdateProfilePayload!
+    
+    # Google authentication
+    googleAuth(input: GoogleAuthInput!): GoogleAuthResponse!
   }
 `;
 
@@ -248,6 +281,162 @@ export const authResolvers = {
         }
         
         throw new GraphQLError('Login failed. Please try again.');
+      }
+    },
+
+    updateProfile: async (parent, { input }, { db, user }) => {
+      try {
+        console.log('📝 Updating profile for user:', user?.id);
+        console.log('📤 Update data:', input);
+
+        if (!user) {
+          throw new GraphQLError('Authentication required', {
+            extensions: { code: 'UNAUTHORIZED' }
+          });
+        }
+
+        // Validate input
+        const updateData = {};
+        
+        if (input.displayName !== undefined) {
+          if (!input.displayName || input.displayName.trim().length < 2) {
+            throw new GraphQLError('Display name must be at least 2 characters long', {
+              extensions: { code: 'INVALID_DISPLAY_NAME' }
+            });
+          }
+          updateData.displayName = input.displayName.trim();
+        }
+
+        if (input.email !== undefined) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!input.email || !emailRegex.test(input.email)) {
+            throw new GraphQLError('Please provide a valid email address', {
+              extensions: { code: 'INVALID_EMAIL' }
+            });
+          }
+          
+          // Check if email is already taken by another user
+          const existingUser = await db.users.findByEmail(input.email.toLowerCase().trim());
+          if (existingUser && existingUser._id.toString() !== user.id) {
+            throw new GraphQLError('Email is already taken by another user', {
+              extensions: { code: 'EMAIL_ALREADY_EXISTS' }
+            });
+          }
+          updateData.email = input.email.toLowerCase().trim();
+        }
+
+        if (input.bio !== undefined) {
+          updateData.bio = input.bio?.trim() || '';
+        }
+
+        if (input.avatarUrl !== undefined) {
+          updateData.avatar = input.avatarUrl?.trim() || '';
+        }
+
+        // Update user profile
+        const updatedUser = await db.users.updateProfile(user.id, updateData);
+        
+        if (!updatedUser) {
+          throw new GraphQLError('Failed to update profile', {
+            extensions: { code: 'UPDATE_FAILED' }
+          });
+        }
+
+        console.log('✅ Profile updated successfully for user:', user.id);
+
+        return {
+          success: true,
+          message: 'Profile updated successfully',
+          user: updatedUser
+        };
+      } catch (error) {
+        console.error('❌ Update profile error:', error.message);
+        
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        
+        return {
+          success: false,
+          message: 'Failed to update profile. Please try again.',
+          user: null
+        };
+      }
+    },
+
+    googleAuth: async (parent, { input }, { db }) => {
+      try {
+        console.log('🔥 [GoogleAuth] Google Auth mutation called');
+        const { token } = input;
+
+        // Verify Google token
+        const googleUserInfo = await verifyGoogleToken(token);
+        console.log('📧 [GoogleAuth] Google user email:', googleUserInfo.email);
+
+        // Check if user already exists by email
+        let existingUser = await db.users.findByEmail(googleUserInfo.email);
+
+        if (existingUser) {
+          console.log('👤 [GoogleAuth] Existing user found, linking Google account...');
+          
+          // Link Google account to existing user
+          const updateData = {
+            googleId: googleUserInfo.googleId,
+            isGoogleUser: true,
+            avatar: googleUserInfo.avatar,
+            isEmailVerified: true,
+          };
+          
+          // Update display name if not set or if Google provides better info
+          if (!existingUser.displayName || existingUser.displayName.trim().isEmpty) {
+            updateData.displayName = generateDisplayName(googleUserInfo);
+          }
+          
+          existingUser = await db.users.updateProfile(existingUser.id, updateData);
+          console.log('✅ [GoogleAuth] Google account linked to existing user');
+          
+        } else {
+          console.log('🆕 [GoogleAuth] Creating new user from Google account...');
+          
+          // Create new user from Google info
+          const username = generateUsernameFromEmail(googleUserInfo.email);
+          const displayName = generateDisplayName(googleUserInfo);
+          
+          const newUserData = {
+            username,
+            email: googleUserInfo.email,
+            displayName,
+            googleId: googleUserInfo.googleId,
+            avatar: googleUserInfo.avatar,
+            isGoogleUser: true,
+            isEmailVerified: true,
+            password: 'google_auth_' + Math.random().toString(36).substring(2), // Dummy password for Google users
+          };
+          
+          existingUser = await db.users.create(newUserData);
+          console.log('✅ [GoogleAuth] New Google user created');
+        }
+
+        // Generate JWT token
+        const jwtToken = generateToken(existingUser.id);
+        
+        console.log('🎯 [GoogleAuth] Google Auth successful for user:', existingUser.id);
+
+        return {
+          success: true,
+          message: 'Google authentication successful!',
+          token: jwtToken,
+          user: existingUser
+        };
+
+      } catch (error) {
+        console.error('❌ [GoogleAuth] Google Auth error:', error);
+        return {
+          success: false,
+          message: error.message || 'Google authentication failed',
+          token: null,
+          user: null
+        };
       }
     }
   }

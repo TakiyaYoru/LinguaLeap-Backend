@@ -97,7 +97,7 @@ const userRepository = {
       }
       
       const user = await User.findByIdAndUpdate(
-        id, 
+        id,
         updateData, 
         { new: true, runValidators: true }
       );
@@ -111,6 +111,31 @@ const userRepository = {
       return null;
     } catch (error) {
       console.error('❌ Error updating user:', error.message);
+      throw error;
+    }
+  },
+
+  // Update user profile (specific fields)
+  async updateProfile(id, updateData) {
+    try {
+      console.log('📝 Updating profile for user:', id);
+      console.log('📤 Update data:', updateData);
+      
+      const user = await User.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true }
+      );
+      
+      if (user) {
+        console.log('✅ Profile updated successfully:', user._id);
+        // Return user without password
+        const { password, ...userWithoutPassword } = user.toObject();
+        return userWithoutPassword;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Error updating profile:', error.message);
       throw error;
     }
   },

@@ -41,6 +41,22 @@ export const UserSchema = new Schema(
       type: String,
       default: null // URL to profile picture
     },
+    bio: {
+      type: String,
+      default: '',
+      maxlength: 500
+    },
+    
+    // Google Auth fields
+    googleId: {
+      type: String,
+      default: null,
+      sparse: true
+    },
+    isGoogleUser: {
+      type: Boolean,
+      default: false
+    },
     
     // Learning Progress
     currentLevel: {
