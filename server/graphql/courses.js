@@ -271,6 +271,12 @@ export const courseTypeDefs = `
     # Get exercises by lesson ID
     lessonExercises(lessonId: ID!): [Exercise!]!
     
+    # Get random exercises for practice
+    randomExercises(limit: Int!): [Exercise!]!
+    listeningExercises: [Exercise!]!
+    readingExercises: [Exercise!]!
+    speakingExercises: [Exercise!]!
+    
     # Get single exercise by ID
     exercise(id: ID!): Exercise
     
@@ -1015,6 +1021,495 @@ export const courseResolvers = {
       } catch (error) {
         console.error('❌ Error in lessonExercises query:', error);
         throw new GraphQLError('Failed to fetch lesson exercises');
+      }
+    },
+
+    // Get random exercises for practice
+    randomExercises: async (parent, { limit }, { db, user }) => {
+      try {
+        console.log('🎯 Getting random exercises for practice, limit:', limit);
+        
+        // Get random exercises that are active and not premium (or user has premium access)
+        const query = { 
+          isActive: true,
+          // Exclude listening and speaking exercises for random practice
+          type: { $nin: ['listening', 'speaking'] }
+        };
+        
+        // If user is not premium, exclude premium exercises
+        if (!user || !user.isPremium) {
+          query.isPremium = { $ne: true };
+        }
+        
+        const exercises = await Exercise.aggregate([
+          { $match: query },
+          { $sample: { size: Math.min(limit, 50) } }, // Limit to 50 max for performance
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'createdBy',
+              foreignField: '_id',
+              as: 'createdBy'
+            }
+          },
+          {
+            $lookup: {
+              from: 'lessons',
+              localField: 'lessonId',
+              foreignField: '_id',
+              as: 'lesson'
+            }
+          },
+          {
+            $lookup: {
+              from: 'units',
+              localField: 'unitId',
+              foreignField: '_id',
+              as: 'unit'
+            }
+          },
+          {
+            $lookup: {
+              from: 'courses',
+              localField: 'courseId',
+              foreignField: '_id',
+              as: 'course'
+            }
+          },
+          { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: '$lesson', preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: '$unit', preserveNullAndEmptyArrays: true } },
+          { $unwind: { path: '$course', preserveNullAndEmptyArrays: true } },
+          { $sort: { sortOrder: 1 } }
+        ]);
+        
+        // Transform exercises to match GraphQL schema
+        return exercises.map(exercise => {
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          // Ensure content is a JSON string
+          let contentString = '{}'; // Default fallback
+          if (exercise.content != null) {
+            if (typeof exercise.content === 'object') {
+              try {
+                contentString = JSON.stringify(exercise.content);
+              } catch (error) {
+                console.warn('⚠️ Error stringifying content for exercise:', exercise._id, error.message);
+                contentString = '{}';
+              }
+            } else if (typeof exercise.content === 'string') {
+              contentString = exercise.content;
+            }
+          }
+
+          // Handle prompt_template fields
+          let promptTemplate = null;
+          if (exercise.prompt_template) {
+            promptTemplate = {
+              ...exercise.prompt_template,
+              expected_output_format: exercise.prompt_template.expected_output_format 
+                ? JSON.stringify(exercise.prompt_template.expected_output_format)
+                : null,
+              fallback_template: exercise.prompt_template.fallback_template
+                ? JSON.stringify(exercise.prompt_template.fallback_template)
+                : null
+            };
+          }
+
+          return {
+            ...exercise,
+            content: contentString,
+            prompt_template: promptTemplate,
+            id: exercise._id.toString(),
+            courseId: exercise.courseId.toString(),
+            unitId: exercise.unitId.toString(),
+            lessonId: exercise.lessonId.toString(),
+            createdBy: exercise.createdBy && exercise.createdBy.username ? exercise.createdBy : null,
+            createdAt: safeDate(exercise.createdAt) || new Date().toISOString(),
+            updatedAt: safeDate(exercise.updatedAt) || new Date().toISOString(),
+            // Ensure other required fields have default values
+            maxScore: exercise.maxScore || 100,
+            xpReward: exercise.xpReward || 5,
+            estimatedTime: exercise.estimatedTime || 30,
+            sortOrder: exercise.sortOrder || 0,
+            successRate: exercise.successRate || 0,
+            skill_focus: exercise.skill_focus || [],
+            tags: exercise.tags || []
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in randomExercises query:', error);
+        throw new GraphQLError('Failed to fetch random exercises');
+      }
+    },
+
+    // Get listening exercises
+    listeningExercises: async (parent, args, { db, user }) => {
+      try {
+        console.log('🎧 Getting listening exercises');
+        
+        // Get listening exercises that are active and not premium (or user has premium access)
+        const query = { 
+          isActive: true,
+          type: 'listening'
+        };
+        
+        // If user is not premium, exclude premium exercises
+        if (!user || !user.isPremium) {
+          query.isPremium = { $ne: true };
+        }
+        
+        const exercises = await Exercise.find(query)
+          .populate('createdBy', 'username displayName')
+          .populate('lessonId', 'title')
+          .populate('unitId', 'title')
+          .populate('courseId', 'title')
+          .sort({ sortOrder: 1 })
+          .limit(100); // Limit to 100 listening exercises
+        
+        // Transform exercises to match GraphQL schema
+        return exercises.map(exercise => {
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          // Ensure content is a JSON string
+          let contentString = '{}'; // Default fallback
+          if (exercise.content != null) {
+            if (typeof exercise.content === 'object') {
+              try {
+                contentString = JSON.stringify(exercise.content);
+              } catch (error) {
+                console.warn('⚠️ Error stringifying content for exercise:', exercise._id, error.message);
+                contentString = '{}';
+              }
+            } else if (typeof exercise.content === 'string') {
+              contentString = exercise.content;
+            }
+          }
+
+          // Handle prompt_template fields
+          let promptTemplate = null;
+          if (exercise.prompt_template) {
+            promptTemplate = {
+              ...exercise.prompt_template,
+              expected_output_format: exercise.prompt_template.expected_output_format 
+                ? JSON.stringify(exercise.prompt_template.expected_output_format)
+                : null,
+              fallback_template: exercise.prompt_template.fallback_template
+                ? JSON.stringify(exercise.prompt_template.fallback_template)
+                : null
+            };
+          }
+
+          return {
+            id: exercise._id.toString(),
+            title: exercise.title || 'Listening Exercise',
+            instruction: exercise.instruction || '',
+            type_display_name: exercise.type_display_name || 'Listening',
+            type: exercise.type,
+            skill_focus: exercise.skill_focus || [],
+            question: {
+              text: exercise.question?.text || '',
+              audioUrl: exercise.question?.audioUrl || null,
+              imageUrl: exercise.question?.imageUrl || null,
+              videoUrl: exercise.question?.videoUrl || null,
+            },
+            content: contentString,
+            maxScore: exercise.maxScore || 10,
+            difficulty: exercise.difficulty || 'beginner',
+            xpReward: exercise.xpReward || 5,
+            timeLimit: exercise.timeLimit || null,
+            estimatedTime: exercise.estimatedTime || 60,
+            requires_audio: exercise.requires_audio || true,
+            requires_microphone: exercise.requires_microphone || false,
+            isPremium: exercise.isPremium || false,
+            sortOrder: exercise.sortOrder || 0,
+            feedback: exercise.feedback || {
+              correct: 'Chính xác!',
+              incorrect: 'Chưa chính xác. Hãy thử lại!',
+              hint: null
+            },
+            createdBy: exercise.createdBy ? {
+              id: exercise.createdBy._id.toString(),
+              username: exercise.createdBy.username,
+              displayName: exercise.createdBy.displayName
+            } : null,
+            lesson: exercise.lessonId ? {
+              id: exercise.lessonId._id.toString(),
+              title: exercise.lessonId.title
+            } : null,
+            unit: exercise.unitId ? {
+              id: exercise.unitId._id.toString(),
+              title: exercise.unitId.title
+            } : null,
+            course: exercise.courseId ? {
+              id: exercise.courseId._id.toString(),
+              title: exercise.courseId.title
+            } : null,
+            createdAt: safeDate(exercise.createdAt),
+            updatedAt: safeDate(exercise.updatedAt)
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in listeningExercises query:', error);
+        throw new GraphQLError('Failed to fetch listening exercises', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
+      }
+    },
+
+    // Get reading exercises
+    readingExercises: async (parent, args, { db, user }) => {
+      try {
+        console.log('📖 Getting reading exercises');
+        
+        // Get reading exercises that are active and not premium (or user has premium access)
+        const query = { 
+          isActive: true,
+          type: 'reading'
+        };
+        
+        // If user is not premium, exclude premium exercises
+        if (!user || !user.isPremium) {
+          query.isPremium = { $ne: true };
+        }
+        
+        const exercises = await Exercise.find(query)
+          .populate('createdBy', 'username displayName')
+          .populate('lessonId', 'title')
+          .populate('unitId', 'title')
+          .populate('courseId', 'title')
+          .sort({ sortOrder: 1 })
+          .limit(100); // Limit to 100 reading exercises
+        
+        // Transform exercises to match GraphQL schema
+        return exercises.map(exercise => {
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          // Ensure content is a JSON string
+          let contentString = '{}'; // Default fallback
+          if (exercise.content != null) {
+            if (typeof exercise.content === 'object') {
+              try {
+                contentString = JSON.stringify(exercise.content);
+              } catch (error) {
+                console.warn('⚠️ Error stringifying content for exercise:', exercise._id, error.message);
+                contentString = '{}';
+              }
+            } else if (typeof exercise.content === 'string') {
+              contentString = exercise.content;
+            }
+          }
+
+          // Handle prompt_template fields
+          let promptTemplate = null;
+          if (exercise.prompt_template) {
+            promptTemplate = {
+              ...exercise.prompt_template,
+              expected_output_format: exercise.prompt_template.expected_output_format 
+                ? JSON.stringify(exercise.prompt_template.expected_output_format)
+                : null,
+              fallback_template: exercise.prompt_template.fallback_template
+                ? JSON.stringify(exercise.prompt_template.fallback_template)
+                : null
+            };
+          }
+
+          return {
+            id: exercise._id.toString(),
+            title: exercise.title || 'Reading Exercise',
+            instruction: exercise.instruction || '',
+            type_display_name: exercise.type_display_name || 'Reading',
+            type: exercise.type,
+            skill_focus: exercise.skill_focus || [],
+            question: {
+              text: exercise.question?.text || '',
+              audioUrl: exercise.question?.audioUrl || null,
+              imageUrl: exercise.question?.imageUrl || null,
+              videoUrl: exercise.question?.videoUrl || null,
+            },
+            content: contentString,
+            maxScore: exercise.maxScore || 10,
+            difficulty: exercise.difficulty || 'beginner',
+            xpReward: exercise.xpReward || 5,
+            timeLimit: exercise.timeLimit || null,
+            estimatedTime: exercise.estimatedTime || 60,
+            requires_audio: exercise.requires_audio || false,
+            requires_microphone: exercise.requires_microphone || false,
+            isPremium: exercise.isPremium || false,
+            sortOrder: exercise.sortOrder || 0,
+            feedback: exercise.feedback || {
+              correct: 'Chính xác!',
+              incorrect: 'Chưa chính xác. Hãy thử lại!',
+              hint: null
+            },
+            createdBy: exercise.createdBy ? {
+              id: exercise.createdBy._id.toString(),
+              username: exercise.createdBy.username,
+              displayName: exercise.createdBy.displayName
+            } : null,
+            lesson: exercise.lessonId ? {
+              id: exercise.lessonId._id.toString(),
+              title: exercise.lessonId.title
+            } : null,
+            unit: exercise.unitId ? {
+              id: exercise.unitId._id.toString(),
+              title: exercise.unitId.title
+            } : null,
+            course: exercise.courseId ? {
+              id: exercise.courseId._id.toString(),
+              title: exercise.courseId.title
+            } : null,
+            createdAt: safeDate(exercise.createdAt),
+            updatedAt: safeDate(exercise.updatedAt)
+          };
+        });
+      } catch (error) {
+        console.error('❌ Error in readingExercises query:', error);
+        throw new GraphQLError('Failed to fetch reading exercises', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
+      }
+    },
+
+    // Get speaking exercises
+    speakingExercises: async (parent, args, { db, user }) => {
+      try {
+        console.log('🎤 Getting speaking exercises');
+        
+        // Get speaking exercises that are active and not premium (or user has premium access)
+        const query = { 
+          isActive: true,
+          type: 'speaking'
+        };
+        
+        // If user is not premium, exclude premium exercises
+        if (!user || !user.isPremium) {
+          query.isPremium = { $ne: true };
+        }
+        
+        const exercises = await Exercise.find(query)
+          .populate('createdBy', 'username displayName')
+          .populate('lessonId', 'title')
+          .populate('unitId', 'title')
+          .populate('courseId', 'title')
+          .sort({ sortOrder: 1 })
+          .limit(100); // Limit to 100 speaking exercises
+        
+        // Transform exercises to match GraphQL schema
+        return exercises.map(exercise => {
+          // Safely convert dates to ISO strings
+          const safeDate = (date) => {
+            if (!date) return null;
+            try {
+              return new Date(date).toISOString();
+            } catch (err) {
+              console.warn('⚠️ Invalid date value:', date);
+              return null;
+            }
+          };
+
+          // Ensure content is a JSON string
+          let contentString = '{}'; // Default fallback
+          if (exercise.content != null) {
+            if (typeof exercise.content === 'object') {
+              try {
+                contentString = JSON.stringify(exercise.content);
+              } catch (error) {
+                console.warn('⚠️ Error stringifying content for exercise:', exercise._id, error.message);
+                contentString = '{}';
+              }
+            } else if (typeof exercise.content === 'string') {
+              contentString = exercise.content;
+            }
+          }
+
+          // Handle prompt_template fields
+          let promptTemplate = null;
+          if (exercise.prompt_template) {
+            promptTemplate = {
+              ...exercise.prompt_template,
+              expected_output_format: exercise.prompt_template.expected_output_format 
+                ? JSON.stringify(exercise.prompt_template.expected_output_format)
+                : null,
+              fallback_template: exercise.prompt_template.fallback_template
+                ? JSON.stringify(exercise.prompt_template.fallback_template)
+                : null
+            };
+          }
+
+          return {
+            id: exercise._id.toString(),
+            title: exercise.title || 'Speaking Exercise',
+            instruction: exercise.instruction || '',
+            type_display_name: exercise.type_display_name || 'Speaking',
+            type: exercise.type,
+            skill_focus: exercise.skill_focus || [],
+            question: {
+              text: exercise.question?.text || '',
+              audioUrl: exercise.question?.audioUrl || null,
+              imageUrl: exercise.question?.imageUrl || null,
+              videoUrl: exercise.question?.videoUrl || null,
+            },
+            content: contentString,
+            maxScore: exercise.maxScore || 10,
+            difficulty: exercise.difficulty || 'beginner',
+            xpReward: exercise.xpReward || 5,
+            timeLimit: exercise.timeLimit || null,
+            estimatedTime: exercise.estimatedTime || 60,
+            requires_audio: exercise.requires_audio || false,
+            requires_microphone: exercise.requires_microphone || true, // Speaking requires microphone
+            isPremium: exercise.isPremium || false,
+            sortOrder: exercise.sortOrder || 0,
+            feedback: exercise.feedback || {
+              correct: 'Phát âm tuyệt vời!',
+              incorrect: 'Hãy thử lại, nói rõ ràng hơn.',
+              hint: 'Chú ý phát âm từng từ một cách chậm và rõ ràng.'
+            },
+            tags: exercise.tags || [],
+            createdAt: safeDate(exercise.createdAt),
+            updatedAt: safeDate(exercise.updatedAt),
+            createdBy: exercise.createdBy ? {
+              id: exercise.createdBy._id.toString(),
+              username: exercise.createdBy.username,
+              displayName: exercise.createdBy.displayName
+            } : null
+          };
+        });
+        
+        console.log(`✅ Found ${exercises.length} speaking exercises`);
+        return exercises;
+      } catch (error) {
+        console.error('❌ Error in speakingExercises query:', error);
+        throw new GraphQLError('Failed to fetch speaking exercises', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
       }
     },
   },

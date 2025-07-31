@@ -1032,23 +1032,30 @@ export const learnmapResolvers = {
           if (currentLessonProgress) {
             // Tìm lesson có sortOrder cao hơn 1 đơn vị
             // Cần lấy lesson content để biết sortOrder
-            const lessonContent = await Lesson.findById(lessonId);
-            if (lessonContent) {
-              const nextLessonContent = await Lesson.findOne({
-                unitId: targetUnit.unitId,
-                sortOrder: lessonContent.sortOrder + 1
-              });
-              
-              if (nextLessonContent) {
-                const nextLessonProgress = targetUnit.lessonProgress.find(
-                  l => l.lessonId.toString() === nextLessonContent._id.toString()
-                );
+            try {
+              const lessonContent = await Lesson.findById(lessonId);
+              if (lessonContent) {
+                const nextLessonContent = await Lesson.findOne({
+                  unitId: targetUnit.unitId,
+                  sortOrder: lessonContent.sortOrder + 1
+                });
                 
-                if (nextLessonProgress && nextLessonProgress.status === 'locked') {
-                  nextLessonProgress.status = 'unlocked';
-                  console.log('🔓 [updateExerciseProgress] Unlocked next lesson by sortOrder:', nextLessonProgress.lessonId);
+                if (nextLessonContent) {
+                  const nextLessonProgress = targetUnit.lessonProgress.find(
+                    l => l.lessonId.toString() === nextLessonContent._id.toString()
+                  );
+                  
+                  if (nextLessonProgress && nextLessonProgress.status === 'locked') {
+                    nextLessonProgress.status = 'unlocked';
+                    console.log('🔓 [updateExerciseProgress] Unlocked next lesson by sortOrder:', nextLessonProgress.lessonId);
+                  }
                 }
+              } else {
+                console.log('⚠️ [updateExerciseProgress] Lesson content not found for lessonId:', lessonId);
               }
+            } catch (lessonError) {
+              console.error('⚠️ [updateExerciseProgress] Error finding lesson content:', lessonError);
+              // Continue without unlocking next lesson
             }
           }
 
@@ -1101,7 +1108,13 @@ export const learnmapResolvers = {
         };
       } catch (error) {
         console.error('[updateExerciseProgress] Error:', error);
-        return { success: false, message: 'Internal server error', exerciseProgress: null };
+        console.error('[updateExerciseProgress] Error stack:', error.stack);
+        console.error('[updateExerciseProgress] Error details:', {
+          lessonId,
+          exerciseProgressInput,
+          userId: context.user?.userId || context.user?._id || context.user?.id
+        });
+        return { success: false, message: `Internal server error: ${error.message}`, exerciseProgress: null };
       }
     },
 

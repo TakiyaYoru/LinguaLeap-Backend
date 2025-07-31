@@ -4,7 +4,7 @@
 
 import { GraphQLError } from 'graphql';
 import { db } from '../data/mongoRepo.js';
-import { UserProgress } from '../data/models/index.js';
+import { UserProgress, User } from '../data/models/index.js';
 
 // ===============================================
 // TYPE DEFINITIONS
@@ -73,6 +73,15 @@ export const gamificationTypeDefs = `
     newDiamonds: Int!
   }
 
+  type PracticeRewardResult {
+    success: Boolean!
+    message: String!
+    xpAwarded: Int!
+    diamondsAwarded: Int!
+    newTotalXP: Int!
+    newDiamonds: Int!
+  }
+
   extend type Query {
     # Get user gamification stats
     gamificationStats: GamificationStats!
@@ -96,6 +105,9 @@ export const gamificationTypeDefs = `
     
     # Use heart (for wrong answers)
     useHeart: GamificationStats!
+    
+    # Award practice rewards
+    awardPracticeRewards(xp: Int!, diamonds: Int!): PracticeRewardResult!
   }
 `;
 
@@ -402,6 +414,53 @@ export const gamificationResolvers = {
       } catch (error) {
         console.error('❌ Error using heart:', error.message);
         throw new GraphQLError('Failed to use heart', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' }
+        });
+      }
+    },
+
+    // Award practice rewards
+    awardPracticeRewards: async (_, { xp, diamonds }, { user }) => {
+      try {
+        if (!user) {
+          throw new GraphQLError('Authentication required', {
+            extensions: { code: 'UNAUTHENTICATED' }
+          });
+        }
+
+        console.log('🎁 Awarding practice rewards:', { xp, diamonds, userId: user.userId });
+
+        // Update user's XP and diamonds
+        const userData = await User.findByIdAndUpdate(
+          user.userId,
+          {
+            $inc: {
+              totalXP: xp,
+              diamonds: diamonds
+            }
+          },
+          { new: true }
+        );
+
+        if (!userData) {
+          throw new GraphQLError('User not found', {
+            extensions: { code: 'NOT_FOUND' }
+          });
+        }
+
+        console.log('✅ Practice rewards awarded successfully');
+
+        return {
+          success: true,
+          message: `Successfully awarded ${xp} XP and ${diamonds} diamonds for practice completion!`,
+          xpAwarded: xp,
+          diamondsAwarded: diamonds,
+          newTotalXP: userData.totalXP,
+          newDiamonds: userData.diamonds
+        };
+      } catch (error) {
+        console.error('❌ Error awarding practice rewards:', error.message);
+        throw new GraphQLError('Failed to award practice rewards', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' }
         });
       }
